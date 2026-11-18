@@ -35,7 +35,7 @@ Requisitos mínimos: Linux x86_64/arm64 com `curl`, `tar` e `gzip`. O bootstrap 
 sudo: Node 26 portátil, `opencode-ai`, o código do Hefesto, a build da web e o comando `hefesto`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SaladaDeFlutter/Hefesto/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/SaladaDeFlutter/Hefesto/refs/heads/main/scripts/bootstrap.sh | bash
 ```
 
 Abra um novo terminal ou ajuste o `PATH` se o instalador avisar:
