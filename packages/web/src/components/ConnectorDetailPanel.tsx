@@ -130,7 +130,7 @@ export default function ConnectorDetailPanel({
   function fieldValue(field: ConnectorField): string | boolean {
     const value = config[field.key];
     if (field.type === "checkbox") return Boolean(value ?? field.default ?? false);
-    if (field.secret) return "";
+    if (field.secret) return String(value ?? "");
     return String(value ?? field.default ?? "");
   }
 
@@ -434,7 +434,10 @@ export default function ConnectorDetailPanel({
                 </span>
                 <div>
                   <strong>Conector conectado</strong>
-                  <p>As ferramentas já estão disponíveis nas conversas desta instância.</p>
+                  <p>
+                    As ferramentas já estão disponíveis nas conversas desta instância. O bot também
+                    pode responder menções e DMs no Discord.
+                  </p>
                 </div>
               </div>
             ) : connected ? (

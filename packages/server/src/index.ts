@@ -66,7 +66,10 @@ async function main() {
   const engines = new EngineManager(join(DATA_DIR, "engines"), async (id) => {
     const instance = await store.get(id);
     const current = await settings.get();
-    return connectorLaunches(instance?.connectors, ROOT, current.defaultConnectors);
+    return connectorLaunches(instance?.connectors, ROOT, current.defaultConnectors, {
+      HEFESTO_INSTANCE_ID: id,
+      HEFESTO_SERVER_URL: `http://127.0.0.1:${PORT}`,
+    });
   });
   const status = await catalog.status();
   console.log(
@@ -91,6 +94,24 @@ async function main() {
   });
 
   server.listen(PORT, "127.0.0.1", () => console.log(`> abra http://127.0.0.1:${PORT}`));
+
+  void Promise.all(
+    (await store.list()).map(async (instance) => {
+      const bridge = instance.connectors?.some(
+        (connector) =>
+          connector.definitionId === "discord" &&
+          connector.enabled &&
+          Boolean(connector.config?.token),
+      );
+      if (!bridge) return;
+      try {
+        await engines.get(instance.id);
+        console.log(`[hefesto] bridge Discord pronto: ${instance.name}`);
+      } catch (e) {
+        console.error(`[hefesto] falha ao iniciar bridge de ${instance.name}:`, (e as Error).message);
+      }
+    }),
+  );
 
   let closing = false;
   const shutdown = async () => {
@@ -258,6 +279,48 @@ async function handleApi(
       return;
     }
     return methodNotAllowed(res);
+  }
+
+  if (seg.length === 4 && seg[3] === "bridge") {
+    if (method !== "POST") return methodNotAllowed(res);
+    const instance = await store.get(id);
+    if (!instance) return notFound(res);
+    const body = await readJson(req, 32_000);
+    const text = typeof body.text === "string" ? body.text.trim().slice(0, 20_000) : "";
+    if (!text) throw new HttpError(400, "mensagem vazia");
+    const engine = await engines.get(instance.id);
+    let sessionId = instance.sessionId;
+    if (!sessionId) {
+      const session = await engine.client.createSession({ title: instance.name });
+      sessionId = session.id;
+      await store.setSession(instance.id, sessionId);
+    }
+    const prompt = {
+      parts: [{ type: "text" as const, text }],
+      system: instance.systemPrompt,
+      model: instance.model,
+    };
+    let result;
+    try {
+      result = await engine.client.sendPrompt(sessionId, prompt);
+    } catch (e) {
+      if (!/404|not found/i.test((e as Error).message)) throw e;
+      const session = await engine.client.createSession({ title: instance.name });
+      sessionId = session.id;
+      await store.setSession(instance.id, sessionId);
+      result = await engine.client.sendPrompt(sessionId, prompt);
+    }
+    const reply = (result.parts ?? [])
+      .map((part) =>
+        part.type === "text" && typeof (part as { text?: unknown }).text === "string"
+          ? (part as { text: string }).text
+          : "",
+      )
+      .filter(Boolean)
+      .join("\n\n")
+      .trim();
+    json(res, { reply });
+    return;
   }
 
   if (seg.length === 4 && seg[3] === "providers" && method === "GET") {

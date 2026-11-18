@@ -17,7 +17,7 @@ e as engines das instâncias são separadas: nenhuma credencial ou conector vaza
 - Modelos gratuitos do pacote embutido do opencode: `opencode` e `opencode-go`.
 - Provedores externos conectados com API key apenas na engine da instância.
 - Conectores MCP por instância, com configuração guiada, credenciais mascaradas e status real.
-- Conector Discord com 34 ferramentas, convite de bot e fluxo em passos.
+- Conector Discord com 34 ferramentas, convite de bot e bridge inbound para menções/DMs.
 - Servidor local com API HTTP, proxy SSE/HTTP e banner ASCII no terminal.
 - `npm start` detecta a porta ocupada e pergunta se pode encerrar o processo atual.
 
@@ -26,6 +26,78 @@ e as engines das instâncias são separadas: nenhuma credencial ou conector vaza
 - Node.js 26 ou superior
 - npm
 - binário `opencode` disponível no `PATH`
+
+## Instalação no Linux
+
+### Usuário sem nada (recomendado)
+
+Requisitos mínimos: Linux x86_64/arm64 com `curl`, `tar` e `gzip`. O bootstrap instala tudo em `~/.hefesto`, sem
+sudo: Node 26 portátil, `opencode-ai`, o código do Hefesto, a build da web e o comando `hefesto`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SaladaDeFlutter/Hefesto/main/scripts/bootstrap.sh | bash
+```
+
+Abra um novo terminal ou ajuste o `PATH` se o instalador avisar:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Depois:
+
+```bash
+hefesto
+```
+
+O comando imprime o banner ASCII, sobe o servidor com a web pronta e abre o navegador. Para não abrir:
+
+```bash
+hefesto --no-open
+```
+
+Para atualizar:
+
+```bash
+hefesto upgrade
+```
+
+O upgrade baixa a versão atual do repositório, rebuilda e troca o código. A instalação ocupa aproximadamente 500 MB.
+Você pode trocar o destino com `HEFESTO_HOME` e o diretório do comando com `HEFESTO_BIN_DIR`.
+
+### Desenvolvedor / checkout
+
+Para trabalhar no código:
+
+```bash
+git clone https://github.com/SaladaDeFlutter/Hefesto.git
+cd Hefesto
+./scripts/install.sh
+```
+
+O instalador roda o build, cria o comando `hefesto` em `~/.local/bin` e deixa o upgrade ligado ao git. Nesse modo,
+`hefesto upgrade` faz `git pull --ff-only`, `npm install` e `npm run build`.
+
+Instalações feitas a partir do checkout usam `./data`. O bootstrap e o pacote npm usam `~/.local/share/hefesto` por
+padrão; defina `HEFESTO_DATA_DIR` para escolher outro diretório.
+
+### Pacote npm
+
+Depois de publicado, o pacote pode ser instalado globalmente:
+
+```bash
+npm install -g @saladadeflutter/hefesto
+```
+
+Para gerar e instalar um pacote local com a web já buildada:
+
+```bash
+npm run build
+npm pack
+npm install -g ./saladadeflutter-hefesto-0.0.0.tgz
+```
+
+Nesse modo, `hefesto upgrade` usa `npm install -g @saladadeflutter/hefesto@latest`.
 
 ## Como rodar
 
@@ -114,10 +186,10 @@ Campos do conector:
 | Token do bot | `DISCORD_TOKEN` | Obrigatório; salvo por instância e mascarado na API/UI. |
 | Application ID | `DISCORD_APP_ID` | Opcional; necessário para gerar o convite. |
 | Guild ID | `DISCORD_GUILD_ID` | Opcional; restringe ferramentas a um servidor. |
-| Intent de conteúdo | `FLUX_MESSAGE_CONTENT` | Opcional; necessário para ler texto de mensagens. |
+| Intent de conteúdo | `DISCORD_MESSAGE_CONTENT` | Opcional; necessário para ler texto de mensagens no servidor. |
 | Modo simulação | `DRY_RUN` | Opcional; não executa ações reais no Discord. |
 
-A raiz do servidor MCP local é configurada por `HEFESTO_DISCORD_MCP_ROOT`.
+O conector roda dentro do próprio Hefesto, em `packages/connectors/discord`. O bridge responde a menções e DMs. Ao iniciar, o servidor sobe automaticamente as instâncias que têm token salvo para manter o bot online.
 
 ## Configuração
 
@@ -128,8 +200,7 @@ O servidor carrega automaticamente o arquivo `.env` da raiz.
 | `PORT` | `4100` | Porta da interface web. |
 | `OPENCODE_BIN` | `opencode` no PATH | Binário do motor. |
 | `HEFESTO_MODEL` | automático | Modelo padrão no formato `provedor/modelo`. |
-| `HEFESTO_DATA_DIR` | `./data` | Diretório de persistência. |
-| `HEFESTO_DISCORD_MCP_ROOT` | caminho local | Raiz do servidor MCP usado pelo conector `discord`. |
+| `HEFESTO_DATA_DIR` | `./data` no checkout; `~/.local/share/hefesto` no CLI global | Diretório de persistência. |
 
 ## Persistência e segredos
 
@@ -138,6 +209,8 @@ O servidor carrega automaticamente o arquivo `.env` da raiz.
 | `data/instances.json` | Instâncias, modelos, sessões e conectores. |
 | `data/instances.json.bak` | Versão anterior do arquivo de instâncias. |
 | `data/settings.json` | Conectores padrão do onboarding. |
+| `data/discord-memory.json` | Apelidos memorizados pelo conector Discord. |
+| `data/discord-warnings.json` | Avisos registrados pelo conector Discord. |
 | `data/catalog/` | Engine isolada do catálogo de modelos. |
 | `data/engines/<id>/` | Dados, configuração, estado e cache de cada instância. |
 
@@ -164,6 +237,7 @@ da API.
 | `POST /api/instances/:id/session` | Garante a sessão da instância. |
 | `POST /api/instances/:id/reset` | Zera a sessão atual. |
 | `POST /api/instances/:id/abort` | Interrompe a tarefa em andamento. |
+| `POST /api/instances/:id/bridge` | Recebe uma mensagem do bridge Discord e devolve a resposta da instância. |
 | `/oc/i/:id/...` | Proxy SSE/HTTP para a engine da instância. |
 
 ## Estrutura
@@ -173,8 +247,8 @@ packages/engine      cliente HTTP tipado do opencode (sessões, prompts, SSE, MC
 packages/core        orquestrador, isolamento de ambiente, health check e registro de conectores
 packages/server      API HTTP, proxy /oc/i/:id, estáticos e banner ASCII
 packages/web         React + Vite: landing, onboarding, painel, chat, conectores e ajustes
-packages/connectors  manifests do catálogo MCP (Discord via stdio)
-scripts              smoke ponta a ponta e verificação interativa da porta
+packages/connectors  catálogo MCP e conector Discord local (stdio + bridge inbound)
+scripts              bootstrap, instalação, smoke e verificação interativa da porta
 data/                instâncias, catálogo e engines isoladas (ignorado pelo git)
 ```
 
@@ -182,6 +256,9 @@ data/                instâncias, catálogo e engines isoladas (ignorado pelo gi
 
 | Comando | O que faz |
 | --- | --- |
+| `./scripts/bootstrap.sh` | Instala Node, opencode e Hefesto em user-space. |
+| `hefesto` | Inicia a build instalada, com banner ASCII e navegador. |
+| `hefesto upgrade` | Atualiza o checkout e rebuilda a aplicação. |
 | `npm start` | Builda a web e inicia o servidor; pergunta antes de encerrar um processo na porta. |
 | `npm run start:server` | Inicia o servidor sem rebuildar a web. |
 | `npm run dev` | Alias de `npm start`. |

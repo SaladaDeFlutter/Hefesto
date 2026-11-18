@@ -103,15 +103,15 @@ export const CONNECTOR_CATALOG: ConnectorDefinition[] = [
         type: "text",
         env: "DISCORD_GUILD_ID",
         placeholder: "123456789012345678",
-        help: "Opcional. Restringe as ferramentas a um servidor específico.",
+        help: "Opcional. Restringe as ferramentas e o bridge a um servidor específico.",
       },
       {
         key: "messageContent",
         label: "Intent de conteúdo de mensagens",
         type: "checkbox",
-        env: "FLUX_MESSAGE_CONTENT",
+        env: "DISCORD_MESSAGE_CONTENT",
         default: false,
-        help: "Necessário apenas se o bot precisar ler texto de mensagens.",
+        help: "Ative o Message Content Intent no Portal. Sem isso, o bridge responde apenas menções e DMs.",
       },
       {
         key: "dryRun",
@@ -123,18 +123,21 @@ export const CONNECTOR_CATALOG: ConnectorDefinition[] = [
       },
     ],
     tools: DISCORD_TOOLS,
-    transport: () => {
-      const mcpRoot = resolve(
-        process.env.HEFESTO_DISCORD_MCP_ROOT ?? process.env.HEFESTO_FLUX_ROOT ?? "/home/flutter/Projetos/flux",
-      );
+    transport: (root) => {
+      const connectorRoot = resolve(root, "packages/connectors/discord");
+      const dataDir = resolve(root, "data");
       return {
         type: "local",
         command: [
           process.execPath,
-          resolve(mcpRoot, "node_modules/tsx/dist/cli.mjs"),
-          resolve(mcpRoot, "src/index.ts"),
+          resolve(root, "node_modules/tsx/dist/cli.mjs"),
+          resolve(connectorRoot, "src/index.ts"),
         ],
-        cwd: mcpRoot,
+        cwd: connectorRoot,
+        environment: {
+          DISCORD_MEMORY_FILE: resolve(dataDir, "discord-memory.json"),
+          DISCORD_WARNINGS_FILE: resolve(dataDir, "discord-warnings.json"),
+        },
         enabled: true,
         timeout: 3_600_000,
       };

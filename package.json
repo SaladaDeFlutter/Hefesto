@@ -1,5 +1,5 @@
 {
-  "name": "hefesto",
+  "name": "@saladadeflutter/hefesto",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,5 +19,33 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
+  },
+  "bin": {
+    "hefesto": "bin/hefesto.mjs"
+  },
+  "files": [
+    "bin/",
+    "docs/",
+    "packages/core/src/",
+    "packages/engine/src/",
+    "packages/server/src/",
+    "packages/connectors/catalog.ts",
+    "packages/connectors/discord/",
+    "packages/web/dist/",
+    "scripts/ensure-port.ts",
+    "README.md"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "discord.js": "^14.28.1",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "A forja local de agentes opencode: inst\u00e2ncias isoladas, chat, modelos e conectores MCP.",
+  "engines": {
+    "node": ">=26"
   }
 }

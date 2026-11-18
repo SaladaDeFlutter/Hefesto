@@ -285,12 +285,17 @@ export function connectorLaunches(
   connectors: InstanceConnector[] | undefined,
   root: string,
   defaultIds: string[],
+  runtimeEnv?: Record<string, string>,
 ): ConnectorLaunch[] {
   return resolveConnectors(connectors, defaultIds).flatMap((connector) => {
     const definition = connector.definitionId ? findConnectorDefinition(connector.definitionId) : undefined;
     const base = definition ? definition.transport(root) : connector.transport;
     if (!base) return [];
-    const environment = { ...(base.type === "local" ? base.environment : undefined), ...environmentFromConfig(connector.config, definition) };
+    const environment = {
+      ...(base.type === "local" ? base.environment : undefined),
+      ...runtimeEnv,
+      ...environmentFromConfig(connector.config, definition),
+    };
     const config: McpConfig =
       base.type === "local"
         ? { ...base, enabled: connector.enabled, ...(Object.keys(environment).length > 0 ? { environment } : {}) }
