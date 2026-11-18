@@ -47,6 +47,19 @@ function run(command: string, args: string[]): Promise<string> {
 
 async function listeningPids(port: number): Promise<number[]> {
   const pids = new Set<number>();
+  if (process.platform === "win32") {
+    try {
+      const output = await run("netstat", ["-ano", "-p", "tcp"]);
+      const pattern = new RegExp(`^\\s*TCP\\s+\\S*:${port}\\s+\\S+\\s+LISTENING\\s+(\\d+)`, "i");
+      for (const line of output.split(/\r?\n/)) {
+        const match = line.match(pattern);
+        if (match) pids.add(Number(match[1]));
+      }
+    } catch {
+      /* netstat indisponível */
+    }
+    return [...pids].filter((pid) => Number.isInteger(pid) && pid > 0);
+  }
   try {
     const output = await run("ss", ["-ltnp", `sport = :${port}`]);
     for (const match of output.matchAll(/pid=(\d+)/g)) pids.add(Number(match[1]));
@@ -68,6 +81,18 @@ async function listeningPids(port: number): Promise<number[]> {
 
 async function processDetails(pids: number[]): Promise<string[]> {
   if (pids.length === 0) return [];
+  if (process.platform === "win32") {
+    const lines: string[] = [];
+    for (const pid of pids) {
+      try {
+        const output = await run("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"]);
+        if (output.trim()) lines.push(output.trim());
+      } catch {
+        /* tasklist indisponível */
+      }
+    }
+    return lines.length > 0 ? lines : pids.map((pid) => `PID ${pid}`);
+  }
   try {
     const output = await run("ps", ["-o", "pid=,args=", "-p", pids.join(",")]);
     return output
@@ -76,6 +101,18 @@ async function processDetails(pids: number[]): Promise<string[]> {
       .filter(Boolean);
   } catch {
     return [];
+  }
+}
+
+async function terminate(pid: number, force: boolean): Promise<void> {
+  if (process.platform === "win32") {
+    await run("taskkill", ["/PID", String(pid), "/T", ...(force ? ["/F"] : [])]).catch(() => undefined);
+    return;
+  }
+  try {
+    process.kill(pid, force ? "SIGKILL" : "SIGTERM");
+  } catch {
+    /* processo já encerrado */
   }
 }
 
@@ -120,27 +157,19 @@ async function main() {
     process.exit(1);
   }
 
-  for (const pid of pids) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      /* processo já encerrado */
-    }
-  }
+  for (const pid of pids) await terminate(pid, false);
 
   if (await waitForFreePort(8_000)) {
     console.log(`Porta ${port} liberada.`);
     return;
   }
 
-  console.error("O processo não encerrou com SIGTERM; enviando SIGKILL.");
-  for (const pid of pids) {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      /* processo já encerrado */
-    }
-  }
+  console.error(
+    process.platform === "win32"
+      ? "O processo não encerrou; forçando com taskkill /F."
+      : "O processo não encerrou com SIGTERM; enviando SIGKILL.",
+  );
+  for (const pid of pids) await terminate(pid, true);
 
   if (await waitForFreePort(3_000)) {
     console.log(`Porta ${port} liberada.`);

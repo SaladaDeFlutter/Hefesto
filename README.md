@@ -99,7 +99,36 @@ npm install -g ./saladadeflutter-hefesto-0.0.0.tgz
 
 Nesse modo, `hefesto upgrade` usa `npm install -g @saladadeflutter/hefesto@latest`.
 
+## Instalação no Windows
+
+Windows nativo não executa `bash`, então o entrypoint é PowerShell. O fluxo é o mesmo do Linux: Node portátil,
+opencode, código do Hefesto, build, comando e upgrade.
+
+Abra o PowerShell e rode:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/SaladaDeFlutter/Hefesto/refs/heads/main/scripts/bootstrap.ps1 | iex"
+```
+
+Depois abra um novo terminal:
+
+```powershell
+hefesto
+```
+
+O instalador cria `%USERPROFILE%\.local\bin\hefesto.cmd`, adiciona ao PATH do usuário e instala tudo em
+`%USERPROFILE%\.hefesto`, sem precisar de administrador. Suporta Windows x64 e arm64.
+
+Para atualizar:
+
+```powershell
+hefesto upgrade
+```
+
+Feche o Hefesto antes de rodar o upgrade no Windows. O upgrade usa o `bootstrap.ps1` local e não depende de git.
+
 ## Como rodar
+
 
 ```bash
 npm install
@@ -248,7 +277,7 @@ packages/core        orquestrador, isolamento de ambiente, health check e regist
 packages/server      API HTTP, proxy /oc/i/:id, estáticos e banner ASCII
 packages/web         React + Vite: landing, onboarding, painel, chat, conectores e ajustes
 packages/connectors  catálogo MCP e conector Discord local (stdio + bridge inbound)
-scripts              bootstrap, instalação, smoke e verificação interativa da porta
+scripts              bootstrap Linux/Windows, instalação, smoke e verificação interativa da porta
 data/                instâncias, catálogo e engines isoladas (ignorado pelo git)
 ```
 
@@ -256,7 +285,8 @@ data/                instâncias, catálogo e engines isoladas (ignorado pelo gi
 
 | Comando | O que faz |
 | --- | --- |
-| `./scripts/bootstrap.sh` | Instala Node, opencode e Hefesto em user-space. |
+| `./scripts/bootstrap.sh` | Instala Node, opencode e Hefesto no Linux em user-space. |
+| `scripts/bootstrap.ps1` | Instala Node, opencode e Hefesto no Windows em user-space. |
 | `hefesto` | Inicia a build instalada, com banner ASCII e navegador. |
 | `hefesto upgrade` | Atualiza o checkout e rebuilda a aplicação. |
 | `npm start` | Builda a web e inicia o servidor; pergunta antes de encerrar um processo na porta. |

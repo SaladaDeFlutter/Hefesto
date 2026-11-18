@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { existsSync, accessSync, constants } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { delimiter, dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { OpenCodeClient, type McpConfig, type ModelRef, type ProviderInfo } from "../../engine/src/index.ts";
 
@@ -190,13 +190,15 @@ function findExecutable(name: string): string {
   const override = process.env.OPENCODE_BIN;
   if (override) return override;
   const path = process.env.PATH ?? "";
-  for (const dir of path.split(":")) {
-    const candidate = resolve(dir, name);
-    try {
-      accessSync(candidate, constants.X_OK);
+  const extensions =
+    process.platform === "win32" && !extname(name)
+      ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";").filter(Boolean)
+      : [""];
+  for (const dir of path.split(delimiter)) {
+    if (!dir) continue;
+    for (const extension of extensions) {
+      const candidate = resolve(dir, name + extension);
       if (existsSync(candidate)) return candidate;
-    } catch {
-      /* keep searching */
     }
   }
   throw new Error(`Could not find executable "${name}" in PATH (set OPENCODE_BIN to override)`);

@@ -22,7 +22,9 @@ const dataDir =
   process.env.HEFESTO_DATA_DIR ??
   (isSourceCheckout
     ? resolve(root, "data")
-    : resolve(process.env.XDG_DATA_HOME ?? resolve(homedir(), ".local", "share"), "hefesto"));
+    : process.platform === "win32"
+      ? resolve(process.env.LOCALAPPDATA ?? resolve(homedir(), "AppData", "Local"), "Hefesto")
+      : resolve(process.env.XDG_DATA_HOME ?? resolve(homedir(), ".local", "share"), "hefesto"));
 
 function help() {
   console.log(`Hefesto ${pkg.version}
@@ -30,7 +32,7 @@ function help() {
 Uso:
   hefesto                 inicia o servidor e abre o navegador
   hefesto start           inicia o servidor
-  hefesto upgrade         atualiza via git, npm e rebuild
+  hefesto upgrade         atualiza para a versão atual
   hefesto version         mostra a versão
   hefesto help            mostra esta ajuda
 
@@ -74,12 +76,17 @@ async function waitForServer(url, child) {
 
 function openBrowser(url) {
   if (args.includes("--no-open") || process.env.HEFESTO_NO_OPEN === "1") return;
-  const opener =
-    process.platform === "linux" ? "xdg-open" : process.platform === "darwin" ? "open" : null;
-  if (!opener) {
-    console.log(`Abra ${url}`);
+  if (process.platform === "win32") {
+    const child = spawn("cmd.exe", ["/c", "start", "", url], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    child.on("error", () => console.log(`Abra ${url}`));
+    child.unref();
     return;
   }
+  const opener = process.platform === "linux" ? "xdg-open" : "open";
   const child = spawn(opener, [url], { detached: true, stdio: "ignore" });
   child.on("error", () => console.log(`Abra ${url}`));
   child.unref();
@@ -115,16 +122,25 @@ async function start() {
 async function upgrade() {
   const dryRun = args.includes("--dry-run") || process.env.HEFESTO_UPGRADE_DRY_RUN === "1";
   if (process.env.HEFESTO_BOOTSTRAP === "1") {
-    const script = resolve(root, "scripts", "bootstrap.sh");
+    const windows = process.platform === "win32";
+    const script =
+      process.env.HEFESTO_BOOTSTRAP_SCRIPT ??
+      resolve(root, "scripts", windows ? "bootstrap.ps1" : "bootstrap.sh");
     if (!existsSync(script)) {
       console.error("Instalador bootstrap não encontrado. Reinstale com o one-liner do README.");
       process.exit(1);
     }
+    const bootstrapCommand = windows ? (process.env.HEFESTO_POWERSHELL ?? "powershell.exe") : "bash";
+    const bootstrapArgs = windows
+      ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Upgrade"]
+      : [script, "--upgrade"];
     if (dryRun) {
-      console.log(`bash ${script} --upgrade`);
+      console.log([bootstrapCommand, ...bootstrapArgs].join(" "));
       return;
     }
-    const result = await run("bash", [script, "--upgrade"]);
+    const result = await run(bootstrapCommand, bootstrapArgs, {
+      cwd: process.env.HEFESTO_HOME ?? homedir(),
+    });
     if (result.code !== 0) process.exit(result.code);
     console.log("Hefesto atualizado. Reinicie o comando hefesto.");
     return;
