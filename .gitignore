@@ -1,2 +1,7 @@
-.env
 node_modules/
+dist/
+data/
+.opencode/
+*.log
+.DS_Store
+.env

@@ -1,11 +1,22 @@
 {
-  "name": "hefestos",
+  "name": "hefesto",
+  "version": "0.0.0",
   "private": true,
-  "dependencies": {
-    "discord.js": "^14.19.3",
-    "pg": "^8.15.5"
-  },
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "packages/connectors/*"
+  ],
   "scripts": {
-    "start": "sh start.sh"
+    "build": "npm --prefix packages/web run build",
+    "start": "npm run build && node packages/server/src/index.ts",
+    "start:server": "node packages/server/src/index.ts",
+    "dev": "npm run start",
+    "typecheck": "tsc -p packages/server && tsc -p packages/web",
+    "smoke": "node scripts/smoke-web.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   }
 }

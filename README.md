@@ -1,114 +1,121 @@
-# Hefestos 🔨
+# Hefestos
 
-> Servidor HTTP do [OpenCode](https://opencode.ai) — o coding agent open source, pronto para deploy no Render.
+```text
+██╗  ██╗███████╗███████╗███████╗███████╗████████╗ ██████╗
+██║  ██║██╔════╝██╔════╝██╔════╝██╔════╝╚══██╔══╝██╔═══██╗
+███████║█████╗  █████╗  █████╗  ███████╗   ██║   ██║   ██║
+██╔══██║██╔══╝  ██╔══╝  ██╔══╝  ╚════██║   ██║   ██║   ██║
+██║  ██║███████╗██║     ███████╗███████║   ██║   ╚██████╔╝
+╚═╝  ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ╚═╝    ╚═════╝
+```
 
-Hefestos é o deus grego da forja e da tecnologia. Este projeto expõe o `opencode web` como um web service, com interface web nativa para interagir com o agente via navegador, além da API REST para bots (Discord, Telegram, etc.).
+A forja de agentes do [opencode](https://opencode.ai). O Hefestos é uma aplicação web local para criar
+**instâncias**: agentes com foto, nome, descrição, personalidade, instruções, modelo e um `opencode serve`
+isolado por instância.
 
-## Stack
+O mesmo ASCII acima aparece colorido no terminal ao iniciar o servidor e na tela inicial da interface.
 
-- **Node.js 22** (slim)
-- **opencode-ai** (última versão)
-- **Docker** (deploy no Render ou qualquer cloud)
+## Como rodar
 
-## Comandos
-
-### Local
+Requer Node 26+ (type stripping nativo de TypeScript) e o binário `opencode` no `PATH`.
 
 ```bash
-# Iniciar o servidor com interface web
-OPENCODE_SERVER_PASSWORD=sua-senha opencode web --port 4096
+npm install
+npm start
 ```
 
-### Docker
+Abra <http://127.0.0.1:4100>. O comando builda a web e inicia o servidor.
+
+Para rodar só o servidor com a web já buildada:
 
 ```bash
-docker build -t hefestos .
-docker run -it --rm \
-  -e OPENCODE_SERVER_PASSWORD=sua-senha \
-  -e ANTHROPIC_API_KEY=sk-... \
-  -p 4096:10000 \
-  hefestos
+npm run build
+npm run start:server
 ```
 
-## Web UI
+## Fluxo
 
-Acesse `http://localhost:4096` no navegador para um chat completo com o agente.
+1. **Landing** (`/`) — mostra o status do catálogo, o desenho ASCII e as instâncias existentes.
+2. **Começar** (`/comecar`) — escolha um modelo grátis ou conecte um provedor com API key; depois crie a
+   instância (foto, nome, descrição, personalidade, instruções e cor).
+3. **Instância** (`/i/:id`) — painel com chat, troca de modelo, configurações e o card do Discord (em breve).
+4. **Chat** (`/i/:id/chat`) — conversa com o prompt da instância, histórico, status de execução, botão de
+   parar (`Esc`) e ferramentas do opencode.
+5. **Configurações** (`/i/:id/config`) — edita identidade/prompt, conecta provedores e reseta a conversa.
 
-## API
+## Isolamento
 
-O servidor também expõe a mesma API REST com spec OpenAPI 3.1. Com o servidor rodando, acesse:
+Cada instância tem seu próprio processo `opencode serve`, com diretórios XDG e portas próprias:
 
-```
-http://localhost:4096/doc
-```
+- `data/engines/<id>/data`
+- `data/engines/<id>/config`
+- `data/engines/<id>/state`
+- `data/engines/<id>/cache`
 
-### Endpoints principais
+O ambiente de cada engine remove variáveis como `OPENCODE_CONFIG`, `OPENCODE_DB`, `*_API_KEY`, `*_TOKEN`,
+`AWS_*`, `AZURE_*` e `GOOGLE_APPLICATION_CREDENTIALS`. Assim, nenhuma credencial global vaza para a instância.
 
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET` | `/global/health` | Health check |
-| `GET` | `/session` | Listar sessões |
-| `POST` | `/session` | Criar sessão |
-| `POST` | `/session/:id/message` | Enviar mensagem |
-| `GET` | `/config/providers` | Listar providers |
-| `GET` | `/agent` | Listar agentes |
+O catálogo de provedores/modelos vem do próprio opencode (models.dev) e roda isolado em `data/catalog`.
+Chaves conectadas pela interface são gravadas apenas no opencode da instância; o Hefesto nunca as salva.
 
-### Autenticação
+Conversas criadas no opencode global não são migradas automaticamente. Ao abrir uma instância antiga, o chat
+detecta a sessão ausente e cria uma nova.
 
-Todas as requisições usam **HTTP Basic Auth**:
+## Configuração
 
-```
-Username: opencode
-Password: <OPENCODE_SERVER_PASSWORD>
-```
+O servidor carrega `.env` da raiz automaticamente.
 
-Exemplo com curl:
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `PORT` | `4100` | porta da interface web |
+| `OPENCODE_BIN` | `opencode` no PATH | binário do motor |
+| `HEFESTO_MODEL` | automático | modelo padrão no formato `provedor/modelo` |
+| `HEFESTO_DATA_DIR` | `./data` | diretório de persistência |
 
-```bash
-curl -s http://opencode:suasenha@localhost:4096/global/health
-```
+## Persistência
 
-## Deploy no Render
+As instâncias ficam em `data/instances.json`. A cada gravação, o Hefesto mantém a versão anterior em
+`data/instances.json.bak`. Todo esse diretório é ignorado pelo git.
 
-1. Crie um **Web Service** no [Render Dashboard](https://dashboard.render.com)
-2. Conecte o repositório do GitHub
-3. Adicione as env vars:
+## API principal
 
-| Variável | Descrição |
-|----------|-----------|
-| `OPENCODE_SERVER_PASSWORD` | Senha para autenticação |
-| `ANTHROPIC_API_KEY` | API key do Claude (opcional) |
-| `OPENAI_API_KEY` | API key do GPT (opcional) |
-| `GEMINI_API_KEY` | API key do Gemini (opcional) |
+| Rota | Descrição |
+| --- | --- |
+| `GET /api/status` | status do catálogo opencode |
+| `GET /api/provider-catalog` | catálogo completo de provedores/modelos |
+| `GET /api/provider-catalog?meta=1` | nomes de provedores para rótulos |
+| `GET/POST /api/instances` | lista/cria instâncias |
+| `GET/PATCH/DELETE /api/instances/:id` | consulta/edita/exclui instância |
+| `GET /api/instances/:id/providers` | provedores da engine isolada |
+| `PUT /api/instances/:id/providers/:provider/auth` | conecta chave na engine isolada |
+| `POST /api/instances/:id/session` | garante sessão da instância |
+| `POST /api/instances/:id/reset` | zera a sessão atual |
+| `POST /api/instances/:id/abort` | interrompe a tarefa em andamento |
+| `/oc/i/:id/...` | proxy SSE/HTTP para a engine da instância |
 
-> O Render define a porta automaticamente via `$PORT` (o Dockerfile já usa `$PORT` com fallback para `10000`).
+## Estrutura
 
-## Exemplo: Bot do Discord
-
-Com o Hefestos rodando, seu bot pode chamar a API REST para interagir com o OpenCode:
-
-```js
-const response = await fetch('http://localhost:4096/session', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Basic ' + btoa('opencode:' + password)
-  }
-})
-const session = await response.json()
-
-// Enviar prompt
-await fetch(`http://localhost:4096/session/${session.id}/message`, {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Basic ' + btoa('opencode:' + password),
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    parts: [{ type: 'text', text: 'explique este código:' }]
-  })
-})
+```text
+packages/engine      cliente HTTP tipado do opencode (sessões, prompts, SSE, MCP)
+packages/core        orquestrador: sobe o opencode, ambientes isolados, health check, conector discord
+packages/server      HTTP: API de instâncias/catálogo, proxy /oc/i/:id, estáticos e banner ASCII
+packages/web         React + Vite: landing, onboarding, painel e chat
+packages/connectors  conectores MCP (discord é um stub por enquanto)
+scripts/smoke-web.ts smoke ponta a ponta do servidor
+data/                instâncias, catálogo e motores isolados (ignorado pelo git)
 ```
 
-## Licença
+## Scripts
 
-MIT — construído sobre o [OpenCode](https://github.com/anomalyco/opencode) (MIT).
+| Comando | O que faz |
+| --- | --- |
+| `npm start` | builda a web e inicia tudo |
+| `npm run build` | builda a web |
+| `npm run typecheck` | checa tipos do servidor e da web |
+| `npm run smoke` | smoke ponta a ponta, incluindo chamada de tool |
+| `SMOKE_SKIP_PROMPT=1 npm run smoke` | smoke rápido, sem enviar prompt |
+
+## Discord
+
+O conector MCP `discord` já é registrado nas engines, mas as ferramentas ainda são stubs. A integração com bots
+fica para a próxima etapa.
