@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="hefesto-title hefesto-desc">
+  <title id="hefesto-title">Hefesto</title>
+  <desc id="hefesto-desc">A forja de agentes opencode</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070b13"/>
+      <stop offset="0.55" stop-color="#0a1220"/>
+      <stop offset="1" stop-color="#0d1626"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.32" r="0.58">
+      <stop offset="0" stop-color="#f5a524" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#f5a524" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#f5a524" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f7c46c"/>
+      <stop offset="0.48" stop-color="#f5a524"/>
+      <stop offset="1" stop-color="#ff7a18"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#213653"/>
+      <stop offset="0.5" stop-color="#14233a"/>
+      <stop offset="1" stop-color="#0b1422"/>
+    </linearGradient>
+    <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="wordGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.2" fill="#2a4064" opacity="0.5"/>
+    </pattern>
+    <clipPath id="card">
+      <rect width="1200" height="360" rx="24"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect width="1200" height="360" fill="url(#bg)"/>
+    <rect width="1200" height="360" fill="url(#dots)" opacity="0.38"/>
+    <rect width="1200" height="360" fill="url(#glow)"/>
+
+    <circle cx="980" cy="172" r="166" fill="none" stroke="#2a4064" opacity="0.58"/>
+    <circle cx="980" cy="172" r="122" fill="none" stroke="#2a4064" opacity="0.35" stroke-dasharray="3 10"/>
+    <circle cx="980" cy="172" r="84" fill="none" stroke="#f5a524" opacity="0.12"/>
+
+    <path d="M0 316 C210 260 350 338 590 302 C840 264 1000 244 1200 298" fill="none" stroke="#f5a524" opacity="0.13"/>
+    <path d="M78 74 V286" stroke="#2a4064" opacity="0.55"/>
+    <path d="M720 74 V286" stroke="#2a4064" opacity="0.35"/>
+
+    <rect x="1" y="1" width="1198" height="358" rx="23" fill="none" stroke="#1c2a42"/>
+  </g>
+
+  <g transform="translate(78 92)">
+    <text
+      x="0"
+      y="0"
+      fill="#f5a524"
+      font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+      font-size="15"
+      font-weight="700"
+      letter-spacing="5"
+    >LOCAL-FIRST</text>
+
+    <text
+      x="0"
+      y="82"
+      fill="url(#amber)"
+      font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+      font-size="82"
+      font-weight="700"
+      letter-spacing="8"
+      filter="url(#wordGlow)"
+    >HEFESTO</text>
+
+    <text
+      x="4"
+      y="128"
+      fill="#9fb1c9"
+      font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+      font-size="17"
+      letter-spacing="4"
+    >A FORJA DE AGENTES OPENCODE</text>
+
+    <path d="M3 156 H378" stroke="url(#amber)" stroke-width="2" opacity="0.75"/>
+
+    <g
+      fill="#7286a4"
+      font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+      font-size="12"
+      letter-spacing="2.5"
+    >
+      <text x="3" y="187">INSTÂNCIAS ISOLADAS</text>
+      <text x="235" y="187">MCP CONNECTORS</text>
+    </g>
+  </g>
+
+  <g transform="translate(792 66)">
+    <ellipse cx="174" cy="224" rx="150" ry="20" fill="#f5a524" opacity="0.08"/>
+
+    <g filter="url(#softGlow)" opacity="0.9">
+      <path d="M206 58 L216 30 L226 58 L254 68 L226 78 L216 106 L206 78 L178 68 Z" fill="#f7c46c"/>
+      <path d="M254 92 L259 78 L264 92 L278 97 L264 102 L259 116 L254 102 L240 97 Z" fill="#f5a524"/>
+      <path d="M162 48 L165 38 L168 48 L178 51 L168 54 L165 64 L162 54 L152 51 Z" fill="#ff7a18"/>
+      <path d="M152 96 L130 74" stroke="#f7c46c" stroke-width="3" stroke-linecap="round"/>
+      <path d="M244 118 L270 136" stroke="#f7c46c" stroke-width="3" stroke-linecap="round"/>
+      <path d="M128 128 L104 142" stroke="#f5a524" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+      <path d="M282 72 L304 62" stroke="#f5a524" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+    </g>
+
+    <path
+      d="M56 96 H246 L226 126 H84 Z"
+      fill="url(#steel)"
+      stroke="#2a4064"
+      stroke-width="2"
+    />
+    <path
+      d="M246 96 C276 96 301 107 322 126 C294 123 270 121 246 121 Z"
+      fill="url(#steel)"
+      stroke="#2a4064"
+      stroke-width="2"
+    />
+    <path
+      d="M112 126 H198 L214 158 H96 Z"
+      fill="url(#steel)"
+      stroke="#2a4064"
+      stroke-width="2"
+    />
+    <path
+      d="M98 158 H206 L224 190 H78 Z"
+      fill="url(#steel)"
+      stroke="#2a4064"
+      stroke-width="2"
+    />
+    <path
+      d="M64 190 H238 L268 220 H34 Z"
+      fill="url(#steel)"
+      stroke="#2a4064"
+      stroke-width="2"
+    />
+
+    <path d="M70 104 H236" stroke="#7dd3fc" stroke-width="2" opacity="0.22"/>
+    <path d="M78 198 H226" stroke="#f5a524" stroke-width="2" opacity="0.32"/>
+    <path d="M146 142 H178" stroke="#f5a524" stroke-width="2" opacity="0.25"/>
+
+    <g fill="none" stroke="#f5a524" stroke-width="2" opacity="0.55">
+      <path d="M40 74 C10 88 0 112 0 140"/>
+      <path d="M48 102 C26 112 18 128 18 148"/>
+    </g>
+  </g>
+
+  <g
+    fill="#526783"
+    font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+    font-size="10"
+    letter-spacing="2"
+  >
+    <text x="78" y="314">OPENCODE · AGENTES · MCP · LOCAL</text>
+    <text x="986" y="314">HEFESTO</text>
+  </g>
+</svg>

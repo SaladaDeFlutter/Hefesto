@@ -1,12 +1,6 @@
-# Hefesto
-
-```text
-█ █ █▀▀ █▀▀ █▀▀ █▀▀ ▀█▀ █▀█
-█▀█ █▀▀ █▀▀ █▀▀ ▀▀█  █  █ █
-▀ ▀ ▀▀▀ ▀   ▀▀▀ ▀▀▀  ▀  ▀▀▀
-
-a forja de agentes opencode
-```
+<p align="center">
+  <img src="docs/hefesto-banner.svg" alt="Hefesto — a forja de agentes opencode" width="100%">
+</p>
 
 Hefesto é uma aplicação web local para criar e operar agentes de código. Cada agente é uma **instância**
 independente, com identidade própria, modelo selecionado, conversa persistida e um processo `opencode serve`
