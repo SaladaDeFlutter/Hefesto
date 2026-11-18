@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Hefesto Mono";
+  src: url("/fonts/hefesto-mono.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --bg: #070b13;
   --bg-soft: #0a111e;
@@ -133,7 +141,7 @@ textarea {
 .ascii {
   margin: 0;
   color: var(--accent);
-  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", "FiraCode Nerd Font", "Adwaita Mono", "Noto Sans Mono", monospace;
+  font-family: "Hefesto Mono", "JetBrainsMono Nerd Font", "JetBrains Mono", "FiraCode Nerd Font", "Adwaita Mono", "Noto Sans Mono", monospace;
   font-size: clamp(5px, 1.15vw, 13px);
   font-variant-ligatures: none;
   font-feature-settings: "liga" 0;
@@ -990,7 +998,7 @@ textarea {
 }
 
 .msg .body code {
-  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", "FiraCode Nerd Font", "Adwaita Mono", "Noto Sans Mono", monospace;
+  font-family: "Hefesto Mono", "JetBrainsMono Nerd Font", "JetBrains Mono", "FiraCode Nerd Font", "Adwaita Mono", "Noto Sans Mono", monospace;
   font-size: 0.9em;
   background: rgba(10, 18, 32, 0.8);
   border: 1px solid var(--line);

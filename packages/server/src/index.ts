@@ -659,12 +659,16 @@ async function serveStatic(pathname: string, res: http.ServerResponse): Promise<
     const s = await stat(target);
     if (s.isDirectory()) target = join(target, "index.html");
     const body = await readFile(target);
-    res.writeHead(200, { "Content-Type": MIME[extname(target).toLowerCase()] ?? "application/octet-stream" });
+    const type = MIME[extname(target).toLowerCase()] ?? "application/octet-stream";
+    res.writeHead(200, {
+      "Content-Type": type,
+      ...(type.startsWith("text/html") ? { "Cache-Control": "no-store" } : {}),
+    });
     res.end(body);
   } catch {
     try {
       const body = await readFile(join(WEB_DIST, "index.html"));
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(body);
     } catch {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
