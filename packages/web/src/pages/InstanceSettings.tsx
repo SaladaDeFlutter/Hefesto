@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type CatalogProvider, type Instance, type ProviderInfo } from "../api";
 import AvatarUpload from "../components/AvatarUpload";
+import InstanceNav from "../components/InstanceNav";
 import TopBar from "../components/TopBar";
 
 export default function InstanceSettings() {
@@ -102,23 +103,6 @@ export default function InstanceSettings() {
     }
   }
 
-  async function resetConversation() {
-    if (!instance) return;
-    if (!window.confirm("Resetar a conversa desta instância?")) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      await api.resetSession(instance.id);
-      setInstance({ ...instance, sessionId: undefined });
-      setNotice("conversa resetada");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function remove() {
     if (!instance) return;
     if (!window.confirm(`Excluir "${instance.name}"? Essa ação não pode ser desfeita.`)) return;
@@ -136,12 +120,15 @@ export default function InstanceSettings() {
   if (!instance) {
     return (
       <div className="page">
-        <TopBar />
+        <TopBar
+          right={
+            <Link to="/" className="btn ghost small">
+              todas as instâncias
+            </Link>
+          }
+        />
         <main className="narrow">
           {error ? <div className="banner error">{error}</div> : <p className="muted">carregando…</p>}
-          <Link to="/" className="btn ghost">
-            Voltar ao início
-          </Link>
         </main>
       </div>
     );
@@ -149,7 +136,7 @@ export default function InstanceSettings() {
 
   return (
     <div className="page instance-shell" style={{ "--accent": instance.accent } as CSSProperties}>
-      <TopBar right={<Link to={`/i/${instance.id}`} className="link">voltar ao painel</Link>} />
+      <TopBar right={<InstanceNav instanceId={instance.id} active="ajustes" />} />
 
       <main className="narrow">
         <h1>Configurações</h1>
@@ -207,9 +194,6 @@ export default function InstanceSettings() {
           </div>
 
           <div className="actions">
-            <button type="button" className="btn ghost" onClick={() => void resetConversation()} disabled={busy}>
-              Resetar conversa
-            </button>
             <button type="submit" className="btn primary" disabled={saving || busy}>
               {saving ? "salvando…" : "Salvar alterações"}
             </button>

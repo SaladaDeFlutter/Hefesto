@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["src", "../core/src", "../engine/src", "../connectors/discord/src"]
+  "include": ["src", "../core/src", "../engine/src", "../connectors"]
 }

@@ -43,7 +43,81 @@ export interface HefestoStatus {
   baseUrl: string;
   version?: string;
   defaultModel?: ModelRef;
-  connector: { registered: boolean; name?: string };
+  connectors: string[];
+}
+
+export interface ConnectorTool {
+  name: string;
+  description?: string;
+}
+
+export interface ConnectorField {
+  key: string;
+  label: string;
+  type: "text" | "number" | "checkbox";
+  env?: string;
+  secret?: boolean;
+  required?: boolean;
+  placeholder?: string;
+  help?: string;
+  default?: string | number | boolean;
+}
+
+export type ConnectorConfigValue = string | number | boolean | null;
+
+export type ConnectorTransport =
+  | {
+      type: "local";
+      command: string[];
+      cwd?: string;
+      environment?: Record<string, string>;
+      enabled?: boolean;
+      timeout?: number;
+    }
+  | { type: "remote"; url: string; enabled?: boolean; timeout?: number };
+
+export interface InstanceConnector {
+  alias: string;
+  definitionId?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+  tools?: ConnectorTool[];
+  transport?: ConnectorTransport;
+  config?: Record<string, ConnectorConfigValue>;
+  enabled: boolean;
+}
+
+export interface ConnectorView extends InstanceConnector {
+  icon: string;
+  fields: ConnectorField[];
+  auth: "none" | "api_key" | "oauth";
+  secrets?: string[];
+  status: string;
+  error?: string;
+}
+
+export interface ConnectorDefinitionView {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: string;
+  auth: "none" | "api_key" | "oauth";
+  defaultEnabled: boolean;
+  fields: ConnectorField[];
+  tools: ConnectorTool[];
+}
+
+export interface ConnectorInput {
+  alias?: string;
+  definitionId?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+  enabled?: boolean;
+  transport?: ConnectorTransport;
+  config?: Record<string, ConnectorConfigValue>;
 }
 
 export interface Instance {
@@ -57,6 +131,7 @@ export interface Instance {
   accent: string;
   systemPrompt: string;
   model?: ModelRef;
+  connectors?: ConnectorView[];
   sessionId?: string;
   createdAt: string;
   updatedAt: string;
@@ -70,6 +145,7 @@ export interface InstanceInput {
   instructions?: string;
   accent?: string;
   model?: ModelRef;
+  connectors?: ConnectorInput[];
   auth?: { providerID: string; key: string };
 }
 
@@ -81,6 +157,7 @@ export interface InstanceUpdate {
   instructions?: string;
   accent?: string;
   model?: ModelRef | null;
+  connectors?: ConnectorInput[];
 }
 
 export interface OpencodePart {
@@ -122,6 +199,12 @@ async function http<T>(url: string, method: string, body?: unknown): Promise<T> 
   return data as T;
 }
 
+export function discordInviteUrl(appId: unknown): string | undefined {
+  const id = typeof appId === "string" || typeof appId === "number" ? String(appId).trim() : "";
+  if (!/^\d{17,20}$/.test(id)) return undefined;
+  return `https://discord.com/api/oauth2/authorize?client_id=${id}&permissions=8&scope=bot`;
+}
+
 export const api = {
   status: (): Promise<HefestoStatus> => http<HefestoStatus>("/api/status", "GET"),
 
@@ -140,6 +223,41 @@ export const api = {
     http(`/api/instances/${encodeURIComponent(id)}/providers/${encodeURIComponent(providerID)}/auth`, "PUT", {
       key,
     }),
+
+  connectorCatalog: (): Promise<{ connectors: ConnectorDefinitionView[] }> =>
+    http("/api/connectors/catalog", "GET"),
+
+  defaultConnectors: (): Promise<{ defaultConnectors: string[] }> =>
+    http("/api/settings/connectors/defaults", "GET"),
+
+  setDefaultConnectors: (ids: string[]): Promise<{ defaultConnectors: string[] }> =>
+    http("/api/settings/connectors/defaults", "PUT", { defaultConnectors: ids }),
+
+  instanceConnectors: (id: string): Promise<{ connectors: ConnectorView[] }> =>
+    http(`/api/instances/${encodeURIComponent(id)}/connectors`, "GET"),
+
+  addInstanceConnector: (
+    id: string,
+    input: ConnectorInput,
+  ): Promise<{ connectors: ConnectorView[]; instance: Instance }> =>
+    http(`/api/instances/${encodeURIComponent(id)}/connectors`, "POST", input),
+
+  updateInstanceConnector: (
+    id: string,
+    alias: string,
+    input: ConnectorInput,
+  ): Promise<{ connectors: ConnectorView[]; instance: Instance }> =>
+    http(`/api/instances/${encodeURIComponent(id)}/connectors/${encodeURIComponent(alias)}`, "PATCH", input),
+
+  removeInstanceConnector: (id: string, alias: string): Promise<{ connectors: ConnectorView[] }> =>
+    http(`/api/instances/${encodeURIComponent(id)}/connectors/${encodeURIComponent(alias)}`, "DELETE"),
+
+  toggleInstanceConnector: (
+    id: string,
+    alias: string,
+    action: "connect" | "disconnect",
+  ): Promise<{ ok: boolean; connectors: ConnectorView[] }> =>
+    http(`/api/instances/${encodeURIComponent(id)}/connectors/${encodeURIComponent(alias)}/${action}`, "POST", {}),
 
   instances: (): Promise<{ instances: Instance[] }> => http("/api/instances", "GET"),
 

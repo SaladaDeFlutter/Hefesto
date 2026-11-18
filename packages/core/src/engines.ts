@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { Hefesto } from "./index.ts";
+import { Hefesto, type ConnectorLaunch } from "./index.ts";
 
 export function isolatedEnv(baseDir: string): Record<string, string> {
   const env: Record<string, string> = {};
@@ -28,11 +28,13 @@ interface Entry {
 
 export class EngineManager {
   private readonly root: string;
+  private readonly resolveConnectors: (id: string) => Promise<ConnectorLaunch[]>;
   private readonly entries = new Map<string, Entry>();
   private readonly starting = new Map<string, Promise<Hefesto>>();
 
-  constructor(root: string) {
+  constructor(root: string, resolveConnectors: (id: string) => Promise<ConnectorLaunch[]>) {
     this.root = root;
+    this.resolveConnectors = resolveConnectors;
   }
 
   dir(id: string): string {
@@ -59,7 +61,8 @@ export class EngineManager {
   private async launch(id: string): Promise<Hefesto> {
     const dir = this.dir(id);
     await mkdir(dir, { recursive: true });
-    return Hefesto.start({ registerConnectors: true, env: isolatedEnv(dir) });
+    const connectors = await this.resolveConnectors(id);
+    return Hefesto.start({ connectors, env: isolatedEnv(dir) });
   }
 
   async stop(id: string): Promise<void> {

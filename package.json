@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "npm --prefix packages/web run build",
+    "prestart": "node scripts/ensure-port.ts",
     "start": "npm run build && node packages/server/src/index.ts",
     "start:server": "node packages/server/src/index.ts",
     "dev": "npm run start",

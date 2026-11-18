@@ -3,14 +3,19 @@ import { createServer } from "node:net";
 import { existsSync, accessSync, constants } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { OpenCodeClient, type ModelRef, type ProviderInfo } from "../../engine/src/index.ts";
+import { OpenCodeClient, type McpConfig, type ModelRef, type ProviderInfo } from "../../engine/src/index.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export interface ConnectorLaunch {
+  alias: string;
+  config: McpConfig;
+}
 
 export interface HefestoOptions {
   opencodeBin?: string;
   port?: number;
-  registerConnectors?: boolean;
+  connectors?: ConnectorLaunch[];
   env?: Record<string, string>;
 }
 
@@ -20,7 +25,7 @@ export interface HefestoStatus {
   baseUrl: string;
   version?: string;
   defaultModel?: ModelRef;
-  connector: { registered: boolean; name?: string };
+  connectors: string[];
 }
 
 export class Hefesto {
@@ -29,7 +34,7 @@ export class Hefesto {
   private _port = 0;
   private _version?: string;
   private _defaultModel?: ModelRef;
-  private connectorRegistered = false;
+  private registeredConnectors: string[] = [];
 
   private constructor(baseUrl: string) {
     this.client = new OpenCodeClient(baseUrl);
@@ -92,8 +97,13 @@ export class Hefesto {
     h._version = version;
     h._defaultModel = await h.pickDefaultModel();
 
-    if (opts.registerConnectors !== false) {
-      await h.registerDiscordConnector();
+    for (const connector of opts.connectors ?? []) {
+      try {
+        await client.addMcp(connector.alias, connector.config);
+        h.registeredConnectors.push(connector.alias);
+      } catch (e) {
+        console.error(`[hefesto] falha ao registrar conector ${connector.alias}:`, (e as Error).message);
+      }
     }
 
     return h;
@@ -144,23 +154,6 @@ export class Hefesto {
     return providers;
   }
 
-  private async registerDiscordConnector(): Promise<void> {
-    const serverPath = resolve(__dirname, "../../connectors/discord/src/server.ts");
-    try {
-      await this.client.addMcp("discord", {
-        type: "local",
-        command: [process.execPath, serverPath],
-        cwd: resolve(__dirname, "../../../"),
-        enabled: true,
-        timeout: 30_000,
-      });
-      this.connectorRegistered = true;
-    } catch (e) {
-      console.error("[hefesto] failed to register discord connector:", (e as Error).message);
-      this.connectorRegistered = false;
-    }
-  }
-
   async status(): Promise<HefestoStatus> {
     return {
       running: this.child?.exitCode === null,
@@ -168,7 +161,7 @@ export class Hefesto {
       baseUrl: this.baseUrl,
       version: this._version,
       defaultModel: this._defaultModel,
-      connector: { registered: this.connectorRegistered, name: this.connectorRegistered ? "discord" : undefined },
+      connectors: [...this.registeredConnectors],
     };
   }
 }

@@ -1,7 +1,9 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, modelLabel, type Instance, type ModelRef, type ProviderInfo } from "../api";
+import { api, modelLabel, type ConnectorView, type Instance, type ModelRef, type ProviderInfo } from "../api";
+import { connectorNeedsAttention } from "../components/ConnectorStatusBadge";
 import Avatar from "../components/Avatar";
+import InstanceNav from "../components/InstanceNav";
 import ModelSelect from "../components/ModelSelect";
 import TopBar from "../components/TopBar";
 
@@ -9,16 +11,21 @@ export default function InstanceDashboard() {
   const { id = "" } = useParams();
   const [instance, setInstance] = useState<Instance | null>(null);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [connectors, setConnectors] = useState<ConnectorView[]>([]);
   const [error, setError] = useState("");
   const [savingModel, setSavingModel] = useState(false);
+  const needsBot = connectors.some(
+    (connector) => connector.definitionId === "discord" && !connector.secrets?.includes("token"),
+  );
 
   useEffect(() => {
     let alive = true;
-    Promise.all([api.instance(id), api.instanceProviders(id)])
-      .then(([inst, prov]) => {
+    Promise.all([api.instance(id), api.instanceProviders(id), api.instanceConnectors(id)])
+      .then(([inst, prov, conn]) => {
         if (!alive) return;
         setInstance(inst.instance);
         setProviders(prov.providers);
+        setConnectors(conn.connectors);
       })
       .catch((e: Error) => {
         if (alive) setError(e.message);
@@ -48,16 +55,19 @@ export default function InstanceDashboard() {
   if (!instance) {
     return (
       <div className="page">
-        <TopBar />
+        <TopBar
+          right={
+            <Link to="/" className="btn ghost small">
+              todas as instâncias
+            </Link>
+          }
+        />
         <main className="narrow">
           {error ? (
             <div className="banner error">Instância não encontrada: {error}</div>
           ) : (
             <p className="muted">abrindo a forja…</p>
           )}
-          <Link to="/" className="btn ghost">
-            Voltar ao início
-          </Link>
         </main>
       </div>
     );
@@ -65,7 +75,7 @@ export default function InstanceDashboard() {
 
   return (
     <div className="page instance-shell" style={{ "--accent": instance.accent } as CSSProperties}>
-      <TopBar right={<Link to="/" className="link">todas as instâncias</Link>} />
+      <TopBar right={<InstanceNav instanceId={instance.id} active="painel" />} />
 
       <main className="dashboard">
         <header className="instance-hero">
@@ -109,30 +119,47 @@ export default function InstanceDashboard() {
             </div>
           </div>
 
-          <div className="dash-card disabled" aria-disabled="true">
-            <span className="dash-icon">#</span>
+          <Link
+            to={
+              needsBot
+                ? `/i/${instance.id}/conectores/discord?tab=config`
+                : `/i/${instance.id}/conectores`
+            }
+            className="dash-card"
+          >
+            <span className="dash-icon">⌁</span>
             <div>
               <h2>
-                Discord <span className="badge soon">em breve</span>
+                Conectores
+                <span className="badge">
+                  {connectors.filter((c) => c.enabled && c.status === "connected" && !connectorNeedsAttention(c)).length}/{connectors.length}
+                </span>
               </h2>
-              <p>Conector MCP já registrado. A integração com bots vem na próxima etapa.</p>
+              <p>
+                {needsBot
+                  ? "Configure o token do bot Discord para ativar as ferramentas."
+                  : connectors.length === 0
+                    ? "Registre servidores MCP nesta instância."
+                    : `${connectors.length} conector${connectors.length === 1 ? "" : "es"} MCP registrado${connectors.length === 1 ? "" : "s"} nesta engine.`}
+              </p>
             </div>
-          </div>
+            <span className="dash-arrow">→</span>
+          </Link>
 
           <Link to={`/i/${instance.id}/config`} className="dash-card">
             <span className="dash-icon">⚙</span>
             <div>
               <h2>Configurações</h2>
-              <p>Editar identidade, prompt, foto, cor e resetar a conversa.</p>
+              <p>Editar identidade, prompt, foto, cor e provedores.</p>
             </div>
             <span className="dash-arrow">→</span>
           </Link>
         </div>
 
-        <section className="prompt-preview">
-          <h2 className="section-title">Prompt do agente</h2>
+        <details className="prompt-preview">
+          <summary className="section-title">Prompt do agente</summary>
           <pre>{instance.systemPrompt}</pre>
-        </section>
+        </details>
       </main>
     </div>
   );

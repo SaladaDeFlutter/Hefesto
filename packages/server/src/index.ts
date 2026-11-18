@@ -6,6 +6,19 @@ import { Hefesto } from "../../core/src/index.ts";
 import { EngineManager, isolatedEnv } from "../../core/src/engines.ts";
 import type { ModelRef, ProviderInfo } from "../../engine/src/index.ts";
 import { InstanceStore, parseInstanceInput, type InstanceInput } from "./instances.ts";
+import { SettingsStore } from "./settings.ts";
+import {
+  catalogViews,
+  connectorLaunches,
+  connectorViews,
+  ConnectorError,
+  defaultConnectorEntries,
+  parseConnectorInput,
+  type InstanceConnector,
+  parseDefaultConnectorIds,
+  publicInstance,
+  resolveConnectors,
+} from "./connectors.ts";
 import { printBanner } from "./banner.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,17 +58,23 @@ async function main() {
   printBanner(`http://127.0.0.1:${PORT}`);
 
   const store = new InstanceStore(DATA_DIR);
+  const settings = new SettingsStore(DATA_DIR);
+  const initialSettings = await settings.get();
   const catalogDir = join(DATA_DIR, "catalog");
   await mkdir(catalogDir, { recursive: true });
-  const catalog = await Hefesto.start({ registerConnectors: true, env: isolatedEnv(catalogDir) });
-  const engines = new EngineManager(join(DATA_DIR, "engines"));
+  const catalog = await Hefesto.start({ env: isolatedEnv(catalogDir) });
+  const engines = new EngineManager(join(DATA_DIR, "engines"), async (id) => {
+    const instance = await store.get(id);
+    const current = await settings.get();
+    return connectorLaunches(instance?.connectors, ROOT, current.defaultConnectors);
+  });
   const status = await catalog.status();
   console.log(
-    `catálogo opencode ${status.version ?? "?"} na porta ${status.port} · discord ${status.connector.registered ? "registrado" : "indisponível"}`,
+    `catálogo opencode ${status.version ?? "?"} na porta ${status.port} · conectores padrão ${initialSettings.defaultConnectors.length}`,
   );
 
   const server = http.createServer((req, res) => {
-    handle(req, res, catalog, catalogDir, engines, store).catch((e: unknown) => {
+    handle(req, res, catalog, catalogDir, engines, store, settings).catch((e: unknown) => {
       const err = e instanceof HttpError ? e : new HttpError(500, (e as Error)?.message ?? "erro interno");
       if (res.headersSent) {
         res.end();
@@ -92,10 +111,11 @@ async function handle(
   catalogDir: string,
   engines: EngineManager,
   store: InstanceStore,
+  settings: SettingsStore,
 ): Promise<void> {
   const u = new URL(req.url ?? "/", "http://x");
   if (u.pathname === "/api" || u.pathname.startsWith("/api/")) {
-    await handleApi(req, res, u, catalog, catalogDir, engines, store);
+    await handleApi(req, res, u, catalog, catalogDir, engines, store, settings);
     return;
   }
   const proxied = u.pathname.match(/^\/oc\/i\/([^/]+)(\/.*)?$/);
@@ -124,6 +144,7 @@ async function handleApi(
   catalogDir: string,
   engines: EngineManager,
   store: InstanceStore,
+  settings: SettingsStore,
 ): Promise<void> {
   const seg = u.pathname.split("/").filter(Boolean);
   const method = req.method ?? "GET";
@@ -145,16 +166,46 @@ async function handleApi(
     return;
   }
 
+  if (seg[1] === "connectors" && seg.length === 3 && seg[2] === "catalog") {
+    if (method !== "GET") return methodNotAllowed(res);
+    json(res, { connectors: catalogViews() });
+    return;
+  }
+
+  if (seg[1] === "settings" && seg.length === 4 && seg[2] === "connectors" && seg[3] === "defaults") {
+    if (method === "GET") {
+      json(res, { defaultConnectors: (await settings.get()).defaultConnectors });
+      return;
+    }
+    if (method === "PUT") {
+      const body = await readJson(req);
+      if (!body || typeof body !== "object") throw new HttpError(400, "payload inválido");
+      let ids: string[];
+      try {
+        ids = parseDefaultConnectorIds((body as Record<string, unknown>).defaultConnectors);
+      } catch (e) {
+        if (e instanceof ConnectorError) throw new HttpError(400, e.message);
+        throw e;
+      }
+      json(res, { defaultConnectors: (await settings.setDefaultConnectors(ids)).defaultConnectors });
+      return;
+    }
+    return methodNotAllowed(res);
+  }
+
   if (seg[1] !== "instances") return notFound(res);
 
   if (seg.length === 2) {
     if (method === "GET") {
-      json(res, { instances: await store.list() });
+      json(res, { instances: (await store.list()).map(publicInstance) });
       return;
     }
     if (method === "POST") {
       const body = await readJson(req);
       const input = parseInstanceInput(body, false) as InstanceInput;
+      if (input.connectors === undefined) {
+        input.connectors = defaultConnectorEntries((await settings.get()).defaultConnectors);
+      }
       const auth = parseAuth(body);
       let instance = await store.create(input);
       try {
@@ -169,7 +220,7 @@ async function handleApi(
         await store.remove(instance.id);
         throw new HttpError(400, `não foi possível iniciar a instância: ${(e as Error).message}`);
       }
-      json(res, { instance }, 201);
+      json(res, { instance: publicInstance(instance) }, 201);
       return;
     }
     return methodNotAllowed(res);
@@ -182,14 +233,21 @@ async function handleApi(
     if (method === "GET") {
       const instance = await store.get(id);
       if (!instance) return notFound(res);
-      json(res, { instance });
+      json(res, { instance: publicInstance(instance) });
       return;
     }
     if (method === "PATCH" || method === "PUT") {
       const patch = parseInstanceInput(await readJson(req), true);
+      const before = await store.get(id);
       const instance = await store.update(id, patch);
       if (!instance) return notFound(res);
-      json(res, { instance });
+      if (
+        patch.connectors !== undefined &&
+        JSON.stringify(before?.connectors) !== JSON.stringify(instance.connectors)
+      ) {
+        await restartEngine(engines, id);
+      }
+      json(res, { instance: publicInstance(instance) });
       return;
     }
     if (method === "DELETE") {
@@ -226,7 +284,89 @@ async function handleApi(
       const model = provider?.models[0];
       if (model) updated = (await store.update(id, { model: { providerID, modelID: model.id } })) ?? instance;
     }
-    json(res, { ok: true, providers, instance: updated });
+    json(res, { ok: true, providers, instance: updated ? publicInstance(updated) : undefined });
+    return;
+  }
+
+  if (seg.length === 4 && seg[3] === "connectors") {
+    const instance = await store.get(id);
+    if (!instance) return notFound(res);
+    if (method === "GET") {
+      const defaults = (await settings.get()).defaultConnectors;
+      const engine = await engines.get(id);
+      json(res, {
+        connectors: await connectorViews(instance.connectors, defaults, engine.client),
+      });
+      return;
+    }
+    if (method === "POST") {
+      const connector = readConnector(await readJson(req));
+      const defaults = (await settings.get()).defaultConnectors;
+      const current = resolveConnectors(instance.connectors, defaults);
+      if (current.some((item) => item.alias.toLowerCase() === connector.alias.toLowerCase())) {
+        throw new HttpError(400, `conector ${connector.alias} já existe`);
+      }
+      const updated = await store.update(id, { connectors: [...current, connector] });
+      await restartEngine(engines, id);
+      const payload = await connectorsPayload(id, store, settings, engines);
+      json(res, { connectors: payload?.connectors ?? [], instance: updated ? publicInstance(updated) : undefined }, 201);
+      return;
+    }
+    return methodNotAllowed(res);
+  }
+
+  if (seg.length === 5 && seg[3] === "connectors") {
+    const instance = await store.get(id);
+    if (!instance) return notFound(res);
+    const alias = decodeURIComponent(seg[4] ?? "");
+    if (method === "PATCH") {
+      const body = await readJson(req);
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        throw new HttpError(400, "payload inválido");
+      }
+      const defaults = (await settings.get()).defaultConnectors;
+      const previous = resolveConnectors(instance.connectors, defaults).find(
+        (item) => item.alias.toLowerCase() === alias.toLowerCase(),
+      );
+      const connector = readConnector({ ...(body as Record<string, unknown>), alias }, alias, previous);
+      const current = resolveConnectors(instance.connectors, defaults).map((item) =>
+        item.alias.toLowerCase() === alias.toLowerCase() ? connector : item,
+      );
+      const updated = await store.update(id, { connectors: current });
+      await restartEngine(engines, id);
+      const payload = await connectorsPayload(id, store, settings, engines);
+      json(res, { connectors: payload?.connectors ?? [], instance: updated ? publicInstance(updated) : undefined });
+      return;
+    }
+    if (method === "DELETE") {
+      const defaults = (await settings.get()).defaultConnectors;
+      const current = resolveConnectors(instance.connectors, defaults).filter(
+        (item) => item.alias.toLowerCase() !== alias.toLowerCase(),
+      );
+      await store.update(id, { connectors: current });
+      await restartEngine(engines, id);
+      const payload = await connectorsPayload(id, store, settings, engines);
+      json(res, { connectors: payload?.connectors ?? [] });
+      return;
+    }
+    return methodNotAllowed(res);
+  }
+
+  if (
+    seg.length === 6 &&
+    seg[3] === "connectors" &&
+    (seg[5] === "connect" || seg[5] === "disconnect") &&
+    method === "POST"
+  ) {
+    if (!(await store.get(id))) return notFound(res);
+    const alias = decodeURIComponent(seg[4] ?? "");
+    const engine = await engines.get(id);
+    const ok =
+      seg[5] === "connect"
+        ? await engine.client.mcpConnect(alias)
+        : await engine.client.mcpDisconnect(alias);
+    const payload = await connectorsPayload(id, store, settings, engines);
+    json(res, { ok, connectors: payload?.connectors ?? [] });
     return;
   }
 
@@ -276,7 +416,37 @@ async function handleApi(
   return notFound(res);
 }
 
-function modelIsFree(info: unknown): boolean {
+async function restartEngine(engines: EngineManager, id: string): Promise<Hefesto> {
+  await engines.stop(id);
+  return engines.get(id);
+}
+
+function readConnector(body: unknown, alias?: string, previous?: InstanceConnector) {
+  try {
+    return parseConnectorInput(body, alias, previous);
+  } catch (e) {
+    if (e instanceof ConnectorError) throw new HttpError(400, e.message);
+    throw e;
+  }
+}
+
+async function connectorsPayload(
+  id: string,
+  store: InstanceStore,
+  settings: SettingsStore,
+  engines: EngineManager,
+) {
+  const instance = await store.get(id);
+  if (!instance) return undefined;
+  const defaults = (await settings.get()).defaultConnectors;
+  const engine = await engines.get(id);
+  return { connectors: await connectorViews(instance.connectors, defaults, engine.client) };
+}
+
+const BUILTIN_FREE_PROVIDERS = new Set(["opencode", "opencode-go"]);
+
+function modelIsFree(info: unknown, providerID: string): boolean {
+  if (!BUILTIN_FREE_PROVIDERS.has(providerID)) return false;
   if (!info || typeof info !== "object") return false;
   const cost = (info as { cost?: { input?: number; output?: number } }).cost;
   return Boolean(cost && cost.input === 0 && cost.output === 0);
@@ -287,7 +457,7 @@ function publicProvider(p: ProviderInfo) {
   const models = Object.entries(p.models ?? {}).map(([id, info]) => ({
     id,
     name: info.name ?? id,
-    free: modelIsFree(info),
+    free: modelIsFree(info, p.id),
   }));
   const publicApi = p.options?.apiKey === "public";
   const credentialed = Boolean(p.key) || p.source === "api";
@@ -330,7 +500,7 @@ async function catalogProviders(catalog: Hefesto, catalogDir: string): Promise<C
         models: Object.entries(provider.models ?? {}).map(([modelID, model]) => ({
           id: modelID,
           name: model.name ?? modelID,
-          free: modelIsFree(model),
+          free: modelIsFree(model, id),
         })),
       }))
       .filter((p) => p.models.length > 0)
@@ -343,7 +513,7 @@ async function catalogProviders(catalog: Hefesto, catalogDir: string): Promise<C
         models: Object.entries(p.models ?? {}).map(([id, info]) => ({
           id,
           name: info.name ?? id,
-          free: modelIsFree(info),
+          free: modelIsFree(info, p.id),
         })),
       }))
       .filter((p) => p.models.length > 0);

@@ -8,17 +8,19 @@ import TopBar from "../components/TopBar";
 export default function Landing() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [providers, setProviders] = useState<ProviderMeta[]>([]);
+  const [connectorCount, setConnectorCount] = useState(0);
   const [status, setStatus] = useState<HefestoStatus | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let alive = true;
-    Promise.all([api.status(), api.instances(), api.providerMeta()])
-      .then(([st, list, prov]) => {
+    Promise.all([api.status(), api.instances(), api.providerMeta(), api.connectorCatalog()])
+      .then(([st, list, prov, connectors]) => {
         if (!alive) return;
         setStatus(st);
         setInstances(list.instances);
         setProviders(prov.providers);
+        setConnectorCount(connectors.connectors.length);
       })
       .catch((e: Error) => {
         if (alive) setError(e.message);
@@ -75,10 +77,14 @@ export default function Landing() {
               <h3>Converse e delegue</h3>
               <p>Cada instância tem chat, seleção de modelo e ferramentas do opencode no mesmo lugar.</p>
             </article>
-            <article className="feature muted">
+            <article className="feature">
               <span className="feature-num">04</span>
-              <h3>Discord em breve</h3>
-              <p>O conector MCP já está registrado; a integração com bots chega na próxima etapa.</p>
+              <h3>Conecte ferramentas</h3>
+              <p>
+                {connectorCount > 0
+                  ? `${connectorCount} conector${connectorCount === 1 ? "" : "es"} MCP no catálogo, registrados por instância.`
+                  : "Registre servidores MCP por instância, sem compartilhar conexões."}
+              </p>
             </article>
           </div>
         </section>

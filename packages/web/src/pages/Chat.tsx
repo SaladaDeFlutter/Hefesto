@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   api,
+  type ConnectorView,
   type Instance,
   type ModelRef,
   type OpencodeMessage,
@@ -9,7 +10,10 @@ import {
   type ProviderInfo,
 } from "../api";
 import Avatar from "../components/Avatar";
+import { connectorNeedsAttention } from "../components/ConnectorStatusBadge";
+import Markdown from "../components/Markdown";
 import ModelSelect from "../components/ModelSelect";
+import TopBar from "../components/TopBar";
 
 type Block =
   | { id: string; kind: "text"; text: string }
@@ -50,10 +54,22 @@ function hydrate(list: OpencodeMessage[]): Msg[] {
   return messages;
 }
 
+function toolOwner(tool: string, connectors: ConnectorView[]): string | undefined {
+  const match = connectors.find((connector) => {
+    const tools = connector.tools ?? [];
+    return (
+      tool.startsWith(`${connector.alias}_`) ||
+      tools.some((item) => tool === item.name || tool.startsWith(`${item.name}_`))
+    );
+  });
+  return match?.alias;
+}
+
 export default function Chat() {
   const { id = "" } = useParams();
   const [instance, setInstance] = useState<Instance | null>(null);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [connectors, setConnectors] = useState<ConnectorView[]>([]);
   const [model, setModel] = useState<ModelRef | undefined>();
   const [defaultModel, setDefaultModel] = useState<ModelRef | undefined>();
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -103,14 +119,16 @@ export default function Chat() {
     }
 
     (async () => {
-      const [{ instance }, prov, st] = await Promise.all([
+      const [{ instance }, prov, st, conn] = await Promise.all([
         api.instance(id),
         api.instanceProviders(id),
         api.status(),
+        api.instanceConnectors(id),
       ]);
       if (!alive) return;
       setInstance(instance);
       setProviders(prov.providers);
+      setConnectors(conn.connectors);
       setModel(instance.model);
       setDefaultModel(st.defaultModel);
 
@@ -204,6 +222,7 @@ export default function Chat() {
         }
       } else {
         setError(message);
+        setDraft(text);
       }
       setBusy(false);
       busyRef.current = false;
@@ -255,12 +274,14 @@ export default function Chat() {
 
   async function changeModel(next: ModelRef | undefined) {
     if (!instance) return;
+    const previous = model;
     setModel(next);
     setError("");
     try {
       const res = await api.updateInstance(instance.id, { model: next ?? null });
       setInstance(res.instance);
     } catch (e) {
+      setModel(previous);
       setError((e as Error).message);
     }
   }
@@ -268,12 +289,16 @@ export default function Chat() {
   if (!instance) {
     return (
       <div className="page">
-        <div className="narrow">
+        <TopBar
+          right={
+            <Link to="/" className="btn ghost small">
+              todas as instâncias
+            </Link>
+          }
+        />
+        <main className="narrow">
           {error ? <div className="banner error">{error}</div> : <p className="muted">abrindo a conversa…</p>}
-          <Link to="/" className="btn ghost">
-            Voltar ao início
-          </Link>
-        </div>
+        </main>
       </div>
     );
   }
@@ -281,15 +306,36 @@ export default function Chat() {
   return (
     <div className="page chat-page" style={{ "--accent": instance.accent } as CSSProperties}>
       <header className="topbar chat-topbar">
-        <Link to={`/i/${instance.id}`} className="brand chat-brand">
+        <Link
+          to={`/i/${instance.id}`}
+          className="brand chat-brand"
+          title="Voltar ao painel"
+          aria-label={`Voltar ao painel de ${instance.name}`}
+        >
           <span className="brand-mark">←</span>
           <Avatar source={instance} size={30} />
           <span>{instance.name}</span>
         </Link>
         <div className="chat-tools">
+          {connectors
+            .filter(
+              (connector) =>
+                connector.enabled &&
+                connector.status === "connected" &&
+                !connectorNeedsAttention(connector),
+            )
+            .map((connector) => (
+              <span className="chip" key={connector.alias}>
+                {connector.name}
+              </span>
+            ))}
+          <Link to={`/i/${instance.id}/conectores`} className="btn small ghost">
+            conectores
+          </Link>
           <ModelSelect providers={providers} value={model} onChange={(m) => void changeModel(m)} allowEmpty />
           <button type="button" className="btn small ghost" onClick={() => void resetConversation()}>
-            nova conversa
+            <span className="chat-new-full">nova conversa</span>
+            <span className="chat-new-short">nova</span>
           </button>
         </div>
       </header>
@@ -310,11 +356,12 @@ export default function Chat() {
             {message.blocks.map((block) =>
               block.kind === "text" ? (
                 <div key={block.id} className="body">
-                  {block.text}
+                  <Markdown text={block.text} />
                 </div>
               ) : (
                 <div key={block.id} className="tool-line">
-                  ▸ {block.tool}
+                  ▸ {toolOwner(block.tool, connectors) ? `${toolOwner(block.tool, connectors)} · ` : ""}
+                  {block.tool}
                   {block.title ? ` — ${block.title}` : ""}
                   {block.status ? ` · ${block.status}` : ""}
                 </div>

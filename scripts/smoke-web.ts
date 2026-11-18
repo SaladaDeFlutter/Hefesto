@@ -56,6 +56,7 @@ async function main() {
   try {
     const st = await waitServer(Date.now() + 60_000);
     console.log("STATUS", JSON.stringify(st));
+    if ((st.connectors ?? []).length > 0) throw new Error("a engine do catálogo não deve registrar conectores");
 
     const page = await fetch(`${BASE}/`);
     const html = await page.text();
@@ -69,6 +70,37 @@ async function main() {
     if (catalog.providers.length === 0) throw new Error("catálogo de provedores vazio");
     if (JSON.stringify(catalog).includes('"key"')) throw new Error("provider key vazou no catálogo");
 
+    const modelCatalog = await jsonReq<{
+      providers: Array<{ id: string; models: Array<{ id: string; free: boolean }> }>;
+    }>("GET", "/api/provider-catalog");
+    const freeProviderIds = modelCatalog.providers
+      .filter((provider) => provider.models.some((model) => model.free))
+      .map((provider) => provider.id);
+    console.log("FREE PROVIDERS", freeProviderIds.join(","));
+    if (freeProviderIds.some((id) => !["opencode", "opencode-go"].includes(id))) {
+      throw new Error("modelos gratuitos fora do pacote embutido do opencode");
+    }
+
+    const connectorCatalog = await jsonReq<{
+      connectors: Array<{
+        id: string;
+        tools: Array<{ name: string }>;
+        fields: Array<{ key: string; secret?: boolean }>;
+      }>;
+    }>("GET", "/api/connectors/catalog");
+    console.log("CONNECTOR CATALOG", connectorCatalog.connectors.map((c) => c.id).join(","));
+    const discordDef = connectorCatalog.connectors.find((c) => c.id === "discord");
+    if (!discordDef || discordDef.tools.length !== 34) {
+      throw new Error("o conector discord deve expor as 34 ferramentas");
+    }
+    if (!discordDef.fields.some((field) => field.key === "token" && field.secret)) {
+      throw new Error("o conector discord deve declarar o token como secreto");
+    }
+
+    const defaults = await jsonReq<{ defaultConnectors: string[] }>("GET", "/api/settings/connectors/defaults");
+    console.log("DEFAULT CONNECTORS", defaults.defaultConnectors.join(","));
+    if (!defaults.defaultConnectors.includes("discord")) throw new Error("discord não é conector padrão");
+
     const created = await jsonReq<{ instance: any }>("POST", "/api/instances", {
       name: "Smoke Test",
       tagline: "instância de teste",
@@ -77,9 +109,48 @@ async function main() {
       accent: "#38bdf8",
     });
     console.log("INSTANCE", created.instance.id);
+    const iid = encodeURIComponent(created.instance.id);
     if (!created.instance.systemPrompt?.includes("Smoke Test")) throw new Error("systemPrompt não foi gerado");
 
-    const iid = encodeURIComponent(created.instance.id);
+    const instanceConnectors = await jsonReq<{
+      connectors: Array<{ alias: string; definitionId?: string; status: string }>;
+    }>("GET", `/api/instances/${iid}/connectors`);
+    console.log(
+      "INSTANCE CONNECTORS",
+      instanceConnectors.connectors.map((c) => `${c.alias}:${c.status}`).join(","),
+    );
+    if (!instanceConnectors.connectors.some((c) => c.definitionId === "discord")) {
+      throw new Error("instância não recebeu o conector padrão discord");
+    }
+
+    const saved = await jsonReq<{ connectors: Array<{ secrets?: string[] }> }>(
+      "PATCH",
+      `/api/instances/${iid}/connectors/discord`,
+      { config: { token: "smoke-token-secreto" } },
+    );
+    if (JSON.stringify(saved).includes("smoke-token-secreto")) {
+      throw new Error("token do bot vazou na resposta da API");
+    }
+    if (!saved.connectors.some((c) => c.secrets?.includes("token"))) {
+      throw new Error("token do bot não foi registrado como secreto");
+    }
+    const afterClear = await jsonReq<{ connectors: Array<{ secrets?: string[] }> }>(
+      "PATCH",
+      `/api/instances/${iid}/connectors/discord`,
+      { config: { token: null } },
+    );
+    if (afterClear.connectors.some((c) => c.secrets?.includes("token"))) {
+      throw new Error("não foi possível limpar o token do bot");
+    }
+
+    const added = await jsonReq<{ connectors: Array<{ alias: string }> }>(
+      "POST",
+      `/api/instances/${iid}/connectors`,
+      { alias: "smoke-custom", transport: { type: "remote", url: "http://127.0.0.1:9/mcp" } },
+    );
+    if (!added.connectors.some((c) => c.alias === "smoke-custom")) throw new Error("add conector falhou");
+    await jsonReq("DELETE", `/api/instances/${iid}/connectors/smoke-custom`);
+
     const prov = await jsonReq<{ providers: Array<{ id: string; credentialed?: boolean }> }>(
       "GET",
       `/api/instances/${iid}/providers`,
@@ -169,7 +240,7 @@ async function main() {
           parts: [
             {
               type: "text",
-              text: 'Use a ferramenta "discord_send_message" para enviar "oi" no canal #geral. Depois responda apenas "feito".',
+              text: 'Use a ferramenta "discord_hora" para saber a hora atual. Depois responda apenas "feito".',
             },
           ],
           model,
@@ -179,7 +250,7 @@ async function main() {
 
       const deadline = Date.now() + 120_000;
       while (Date.now() < deadline) {
-        called = seenTools.some((t) => t.toLowerCase().includes("discord"));
+        called = seenTools.some((t) => t.toLowerCase().includes("hora"));
         if (called && idle) break;
         await sleep(500);
       }
@@ -197,10 +268,10 @@ async function main() {
 
     const requireTool = process.env.SMOKE_REQUIRE_TOOL === "1";
     if (model && !skipPrompt && !called) {
-      console.log("SMOKE AVISO: o modelo não chamou a tool do discord (flaky por natureza)");
+      console.log("SMOKE AVISO: o modelo não chamou a tool discord_hora (flaky por natureza)");
     }
     const ok = skipPrompt || !model ? true : !requireTool || called;
-    console.log(ok ? "SMOKE OK" : "SMOKE FAIL (tool não chamada)");
+    console.log(ok ? "SMOKE OK" : "SMOKE FAIL (tool discord_hora não chamada)");
     cleanup();
     process.exit(ok ? 0 : 1);
   } catch (e) {

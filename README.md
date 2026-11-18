@@ -1,121 +1,209 @@
-# Hefestos
+# Hefesto
 
 ```text
-██╗  ██╗███████╗███████╗███████╗███████╗████████╗ ██████╗
-██║  ██║██╔════╝██╔════╝██╔════╝██╔════╝╚══██╔══╝██╔═══██╗
-███████║█████╗  █████╗  █████╗  ███████╗   ██║   ██║   ██║
-██╔══██║██╔══╝  ██╔══╝  ██╔══╝  ╚════██║   ██║   ██║   ██║
-██║  ██║███████╗██║     ███████╗███████║   ██║   ╚██████╔╝
-╚═╝  ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ╚═╝    ╚═════╝
+█ █ █▀▀ █▀▀ █▀▀ █▀▀ ▀█▀ █▀█
+█▀█ █▀▀ █▀▀ █▀▀ ▀▀█  █  █ █
+▀ ▀ ▀▀▀ ▀   ▀▀▀ ▀▀▀  ▀  ▀▀▀
+
+a forja de agentes opencode
 ```
 
-A forja de agentes do [opencode](https://opencode.ai). O Hefestos é uma aplicação web local para criar
-**instâncias**: agentes com foto, nome, descrição, personalidade, instruções, modelo e um `opencode serve`
-isolado por instância.
+Hefesto é uma aplicação web local para criar e operar agentes de código. Cada agente é uma **instância**
+independente, com identidade própria, modelo selecionado, conversa persistida e um processo `opencode serve`
+isolado.
 
-O mesmo ASCII acima aparece colorido no terminal ao iniciar o servidor e na tela inicial da interface.
+A interface reúne onboarding, painel, chat, configurações e conectores MCP em um só lugar. A engine do catálogo
+e as engines das instâncias são separadas: nenhuma credencial ou conector vaza de uma instância para outra.
+
+## Destaques
+
+- Instâncias com foto, nome, descrição, personalidade, instruções, cor e modelo.
+- Um `opencode serve` isolado por instância, com portas e diretórios próprios.
+- Chat com histórico, streaming, status de execução, parada por `Esc` e renderização Markdown.
+- Modelos gratuitos do pacote embutido do opencode: `opencode` e `opencode-go`.
+- Provedores externos conectados com API key apenas na engine da instância.
+- Conectores MCP por instância, com configuração guiada, credenciais mascaradas e status real.
+- Conector Discord com 34 ferramentas, convite de bot e fluxo em passos.
+- Servidor local com API HTTP, proxy SSE/HTTP e banner ASCII no terminal.
+- `npm start` detecta a porta ocupada e pergunta se pode encerrar o processo atual.
+
+## Requisitos
+
+- Node.js 26 ou superior
+- npm
+- binário `opencode` disponível no `PATH`
 
 ## Como rodar
-
-Requer Node 26+ (type stripping nativo de TypeScript) e o binário `opencode` no `PATH`.
 
 ```bash
 npm install
 npm start
 ```
 
-Abra <http://127.0.0.1:4100>. O comando builda a web e inicia o servidor.
+Abra <http://127.0.0.1:4100>.
 
-Para rodar só o servidor com a web já buildada:
+O `npm start` executa o build da interface e inicia o servidor. Se a porta configurada já estiver em uso, o script
+`prestart` mostra o processo, pergunta se pode encerrá-lo e só continua após confirmação.
+
+Para iniciar apenas o servidor usando a web já buildada:
 
 ```bash
 npm run build
 npm run start:server
 ```
 
-## Fluxo
+Para usar outra porta:
 
-1. **Landing** (`/`) — mostra o status do catálogo, o desenho ASCII e as instâncias existentes.
-2. **Começar** (`/comecar`) — escolha um modelo grátis ou conecte um provedor com API key; depois crie a
-   instância (foto, nome, descrição, personalidade, instruções e cor).
-3. **Instância** (`/i/:id`) — painel com chat, troca de modelo, configurações e o card do Discord (em breve).
-4. **Chat** (`/i/:id/chat`) — conversa com o prompt da instância, histórico, status de execução, botão de
-   parar (`Esc`) e ferramentas do opencode.
-5. **Configurações** (`/i/:id/config`) — edita identidade/prompt, conecta provedores e reseta a conversa.
+```bash
+PORT=4200 npm start
+```
 
-## Isolamento
+## Fluxo da interface
 
-Cada instância tem seu próprio processo `opencode serve`, com diretórios XDG e portas próprias:
+| Tela | Rota | O que faz |
+| --- | --- | --- |
+| Início | `/` | Status do catálogo, apresentação e lista de instâncias. |
+| Onboarding | `/comecar` | Escolha do modelo, provedor opcional, conectores iniciais e criação da instância. |
+| Painel | `/i/:id` | Atalhos para chat, modelo, conectores e ajustes; prompt do agente recolhível. |
+| Chat | `/i/:id/chat` | Conversa, modelo, conectores ativos e nova conversa. |
+| Conectores | `/i/:id/conectores` | Lista limpa dos conectores instalados. |
+| Conector | `/i/:id/conectores/:alias` | Página dedicada com configuração em passos: criar bot, credenciais, convite e conexão. |
+| Ajustes | `/i/:id/config` | Identidade, prompt, provedores e exclusão da instância. |
 
-- `data/engines/<id>/data`
-- `data/engines/<id>/config`
-- `data/engines/<id>/state`
-- `data/engines/<id>/cache`
+A navegação entre painel, chat, conectores e ajustes é consistente em todas as telas de uma instância. Links
+antigos de configuração de conector (`?config=1`) são redirecionados para a página dedicada.
 
-O ambiente de cada engine remove variáveis como `OPENCODE_CONFIG`, `OPENCODE_DB`, `*_API_KEY`, `*_TOKEN`,
-`AWS_*`, `AZURE_*` e `GOOGLE_APPLICATION_CREDENTIALS`. Assim, nenhuma credencial global vaza para a instância.
+## Como funciona
 
-O catálogo de provedores/modelos vem do próprio opencode (models.dev) e roda isolado em `data/catalog`.
-Chaves conectadas pela interface são gravadas apenas no opencode da instância; o Hefesto nunca as salva.
+1. O servidor sobe uma engine de catálogo isolada em `data/catalog`.
+2. Ao criar uma instância, o Hefesto inicia outra engine `opencode serve` em `data/engines/<id>`.
+3. O modelo escolhido e o prompt da instância são enviados nas conversas daquela engine.
+4. Provedores conectados pela interface gravam a chave somente no opencode da instância.
+5. Conectores MCP são registrados na engine da instância e reiniciam essa engine quando necessário.
+6. O status dos conectores vem do endpoint `GET /mcp` do opencode.
 
-Conversas criadas no opencode global não são migradas automaticamente. Ao abrir uma instância antiga, o chat
-detecta a sessão ausente e cria uma nova.
+Cada engine recebe um ambiente limpo. Variáveis como `OPENCODE_CONFIG`, `OPENCODE_DB`, `*_API_KEY`, `*_TOKEN`,
+`AWS_*`, `AZURE_*` e `GOOGLE_APPLICATION_CREDENTIALS` são removidas para evitar vazamento de credenciais globais.
+
+## Modelos e provedores
+
+- Modelos marcados como grátis na interface pertencem apenas aos provedores embutidos `opencode` e `opencode-go`.
+- Provedores adicionados pelo usuário aparecem somente quando configurados na instância.
+- A API key é enviada à engine isolada e não é persistida pelo Hefesto.
+- O modelo pode ser trocado no painel ou no chat; a escolha é salva na instância.
+
+## Conectores MCP
+
+O catálogo começa com o conector `discord` e aceita servidores MCP próprios via `local` (stdio) ou `remote`
+(SSE/HTTP). Cada instância mantém sua própria lista de conectores.
+
+### Discord
+
+O conector `discord` executa um servidor MCP local por stdio e expõe 34 ferramentas com prefixo `discord_`:
+guilds, canais, mensagens, threads, cargos, membros, avisos, aliases, permissões e utilitários (`echo`, `ping`,
+`hora`).
+
+A página do conector conduz o usuário por quatro passos:
+
+1. Criar a aplicação e o bot no Portal do Desenvolvedor do Discord.
+2. Salvar o token do bot e o Application ID.
+3. Convidar o bot para um servidor com o botão de convite.
+4. Conectar o conector à engine da instância.
+
+O convite é gerado a partir do Application ID salvo e usa permissão de administrador. O token fica salvo apenas
+em `data/instances.json`, nunca é devolvido pela API e aparece mascarado na interface.
+
+Campos do conector:
+
+| Campo | Variável | Observação |
+| --- | --- | --- |
+| Token do bot | `DISCORD_TOKEN` | Obrigatório; salvo por instância e mascarado na API/UI. |
+| Application ID | `DISCORD_APP_ID` | Opcional; necessário para gerar o convite. |
+| Guild ID | `DISCORD_GUILD_ID` | Opcional; restringe ferramentas a um servidor. |
+| Intent de conteúdo | `FLUX_MESSAGE_CONTENT` | Opcional; necessário para ler texto de mensagens. |
+| Modo simulação | `DRY_RUN` | Opcional; não executa ações reais no Discord. |
+
+A raiz do servidor MCP local é configurada por `HEFESTO_DISCORD_MCP_ROOT`.
 
 ## Configuração
 
-O servidor carrega `.env` da raiz automaticamente.
+O servidor carrega automaticamente o arquivo `.env` da raiz.
 
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
-| `PORT` | `4100` | porta da interface web |
-| `OPENCODE_BIN` | `opencode` no PATH | binário do motor |
-| `HEFESTO_MODEL` | automático | modelo padrão no formato `provedor/modelo` |
-| `HEFESTO_DATA_DIR` | `./data` | diretório de persistência |
+| `PORT` | `4100` | Porta da interface web. |
+| `OPENCODE_BIN` | `opencode` no PATH | Binário do motor. |
+| `HEFESTO_MODEL` | automático | Modelo padrão no formato `provedor/modelo`. |
+| `HEFESTO_DATA_DIR` | `./data` | Diretório de persistência. |
+| `HEFESTO_DISCORD_MCP_ROOT` | caminho local | Raiz do servidor MCP usado pelo conector `discord`. |
 
-## Persistência
+## Persistência e segredos
 
-As instâncias ficam em `data/instances.json`. A cada gravação, o Hefesto mantém a versão anterior em
-`data/instances.json.bak`. Todo esse diretório é ignorado pelo git.
+| Caminho | Conteúdo |
+| --- | --- |
+| `data/instances.json` | Instâncias, modelos, sessões e conectores. |
+| `data/instances.json.bak` | Versão anterior do arquivo de instâncias. |
+| `data/settings.json` | Conectores padrão do onboarding. |
+| `data/catalog/` | Engine isolada do catálogo de modelos. |
+| `data/engines/<id>/` | Dados, configuração, estado e cache de cada instância. |
+
+O diretório `data/` é ignorado pelo git. Campos secretos são mantidos localmente e mascarados em todas as respostas
+da API.
 
 ## API principal
 
 | Rota | Descrição |
 | --- | --- |
-| `GET /api/status` | status do catálogo opencode |
-| `GET /api/provider-catalog` | catálogo completo de provedores/modelos |
-| `GET /api/provider-catalog?meta=1` | nomes de provedores para rótulos |
-| `GET/POST /api/instances` | lista/cria instâncias |
-| `GET/PATCH/DELETE /api/instances/:id` | consulta/edita/exclui instância |
-| `GET /api/instances/:id/providers` | provedores da engine isolada |
-| `PUT /api/instances/:id/providers/:provider/auth` | conecta chave na engine isolada |
-| `POST /api/instances/:id/session` | garante sessão da instância |
-| `POST /api/instances/:id/reset` | zera a sessão atual |
-| `POST /api/instances/:id/abort` | interrompe a tarefa em andamento |
-| `/oc/i/:id/...` | proxy SSE/HTTP para a engine da instância |
+| `GET /api/status` | Status do catálogo opencode. |
+| `GET /api/provider-catalog` | Catálogo completo de provedores/modelos. |
+| `GET /api/provider-catalog?meta=1` | Nomes de provedores para rótulos. |
+| `GET/POST /api/instances` | Lista/cria instâncias. |
+| `GET/PATCH/DELETE /api/instances/:id` | Consulta/edita/exclui instância. |
+| `GET /api/instances/:id/providers` | Provedores da engine isolada. |
+| `PUT /api/instances/:id/providers/:provider/auth` | Conecta chave na engine isolada. |
+| `GET /api/connectors/catalog` | Catálogo de conectores disponíveis. |
+| `GET/PUT /api/settings/connectors/defaults` | Conectores padrão do onboarding. |
+| `GET/POST /api/instances/:id/connectors` | Lista/adiciona conectores da instância. |
+| `PATCH/DELETE /api/instances/:id/connectors/:alias` | Edita/remove conector. |
+| `POST /api/instances/:id/connectors/:alias/connect` | Conecta um conector. |
+| `POST /api/instances/:id/connectors/:alias/disconnect` | Desconecta um conector. |
+| `POST /api/instances/:id/session` | Garante a sessão da instância. |
+| `POST /api/instances/:id/reset` | Zera a sessão atual. |
+| `POST /api/instances/:id/abort` | Interrompe a tarefa em andamento. |
+| `/oc/i/:id/...` | Proxy SSE/HTTP para a engine da instância. |
 
 ## Estrutura
 
 ```text
 packages/engine      cliente HTTP tipado do opencode (sessões, prompts, SSE, MCP)
-packages/core        orquestrador: sobe o opencode, ambientes isolados, health check, conector discord
-packages/server      HTTP: API de instâncias/catálogo, proxy /oc/i/:id, estáticos e banner ASCII
-packages/web         React + Vite: landing, onboarding, painel e chat
-packages/connectors  conectores MCP (discord é um stub por enquanto)
-scripts/smoke-web.ts smoke ponta a ponta do servidor
-data/                instâncias, catálogo e motores isolados (ignorado pelo git)
+packages/core        orquestrador, isolamento de ambiente, health check e registro de conectores
+packages/server      API HTTP, proxy /oc/i/:id, estáticos e banner ASCII
+packages/web         React + Vite: landing, onboarding, painel, chat, conectores e ajustes
+packages/connectors  manifests do catálogo MCP (Discord via stdio)
+scripts              smoke ponta a ponta e verificação interativa da porta
+data/                instâncias, catálogo e engines isoladas (ignorado pelo git)
 ```
 
 ## Scripts
 
 | Comando | O que faz |
 | --- | --- |
-| `npm start` | builda a web e inicia tudo |
-| `npm run build` | builda a web |
-| `npm run typecheck` | checa tipos do servidor e da web |
-| `npm run smoke` | smoke ponta a ponta, incluindo chamada de tool |
-| `SMOKE_SKIP_PROMPT=1 npm run smoke` | smoke rápido, sem enviar prompt |
+| `npm start` | Builda a web e inicia o servidor; pergunta antes de encerrar um processo na porta. |
+| `npm run start:server` | Inicia o servidor sem rebuildar a web. |
+| `npm run dev` | Alias de `npm start`. |
+| `npm run build` | Builda a interface web. |
+| `npm run typecheck` | Checa tipos do servidor e da web. |
+| `npm run smoke` | Smoke ponta a ponta, incluindo chamada de tool. |
+| `SMOKE_SKIP_PROMPT=1 npm run smoke` | Smoke rápido, sem enviar prompt. |
 
-## Discord
+## Solução de problemas
 
-O conector MCP `discord` já é registrado nas engines, mas as ferramentas ainda são stubs. A integração com bots
-fica para a próxima etapa.
+- **Porta ocupada:** o `npm start` pergunta se pode encerrar o processo atual; responda `s` para liberar ou defina
+  `PORT` para usar outra porta.
+- **`opencode` não encontrado:** confira o `PATH` ou defina `OPENCODE_BIN` com o caminho do binário.
+- **Conector sem credenciais:** abra o conector no painel e siga o passo de credenciais.
+- **Histórico ausente:** o chat cria uma nova sessão automaticamente quando a anterior não existe mais.
+
+---
+
+Feito por **Salada de Flutrer**.

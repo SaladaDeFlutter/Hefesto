@@ -93,6 +93,13 @@ export interface McpRemoteConfig {
 
 export type McpConfig = McpLocalConfig | McpRemoteConfig;
 
+export type McpStatus =
+  | { status: "connected" }
+  | { status: "disabled" }
+  | { status: "failed"; error: string }
+  | { status: "needs_auth" }
+  | { status: "needs_client_registration"; error: string };
+
 export class OpenCodeClient {
   baseUrl: string;
 
@@ -176,8 +183,16 @@ export class OpenCodeClient {
     return this.request("POST", "/mcp", { name, config });
   }
 
-  async mcpStatus(): Promise<Record<string, unknown>> {
+  async mcpStatus(): Promise<Record<string, McpStatus>> {
     return this.request("GET", "/mcp");
+  }
+
+  async mcpConnect(name: string): Promise<boolean> {
+    return this.request("POST", `/mcp/${encodeURIComponent(name)}/connect`, undefined, 15_000);
+  }
+
+  async mcpDisconnect(name: string): Promise<boolean> {
+    return this.request("POST", `/mcp/${encodeURIComponent(name)}/disconnect`, undefined, 15_000);
   }
 
   /**

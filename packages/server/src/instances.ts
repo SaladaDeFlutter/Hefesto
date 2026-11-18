@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ModelRef } from "../../engine/src/index.ts";
+import { parseConnectorList, type InstanceConnector } from "./connectors.ts";
 
 export interface Instance {
   id: string;
@@ -14,6 +15,7 @@ export interface Instance {
   accent: string;
   systemPrompt: string;
   model?: ModelRef;
+  connectors?: InstanceConnector[];
   sessionId?: string;
   createdAt: string;
   updatedAt: string;
@@ -27,6 +29,7 @@ export interface InstanceInput {
   instructions?: string;
   accent?: string;
   model?: ModelRef;
+  connectors?: InstanceConnector[];
 }
 
 export interface InstancePatch extends Partial<InstanceInput> {
@@ -80,6 +83,7 @@ export function parseInstanceInput(body: unknown, partial = false): InstanceInpu
     personality: text(b.personality, 2000, "personalidade", partial),
     instructions: text(b.instructions, 4000, "instruções", partial),
     model: parseModel(b.model),
+    connectors: parseConnectorList(b.connectors),
   };
 
   if (b.accent !== undefined && b.accent !== null) {
@@ -184,6 +188,7 @@ export class InstanceStore {
       avatar: input.avatar,
       accent: input.accent ?? "#f59e0b",
       model: input.model,
+      connectors: input.connectors,
       systemPrompt: buildSystemPrompt(base),
       createdAt: now,
       updatedAt: now,
@@ -215,6 +220,7 @@ export class InstanceStore {
 
     if (patch.clearModel) delete instance.model;
     else if (patch.model !== undefined) instance.model = patch.model;
+    if (patch.connectors !== undefined) instance.connectors = patch.connectors;
 
     await this.persist();
     return instance;
