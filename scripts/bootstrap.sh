@@ -41,17 +41,29 @@ trap cleanup EXIT
 banner() {
   printf '\n%s' "$AMBER"
   cat <<'ART'
-  █ █ █▀▀ █▀▀ █▀▀ █▀▀ ▀█▀ █▀█
-  █▀█ █▀▀ █▀▀ █▀▀ ▀▀█  █  █ █
-  ▀ ▀ ▀▀▀ ▀   ▀▀▀ ▀▀▀  ▀  ▀▀▀
+██╗  ██╗███████╗███████╗███████╗███████╗████████╗ ██████╗
+██║  ██║██╔════╝██╔════╝██╔════╝██╔════╝╚══██╔══╝██╔═══██╗
+███████║█████╗  █████╗  █████╗  ███████╗   ██║   ██║   ██║
+██╔══██║██╔══╝  ██╔══╝  ██╔══╝  ╚════██║   ██║   ██║   ██║
+██║  ██║███████╗██║     ███████╗███████║   ██║   ╚██████╔╝
+╚═╝  ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ╚═╝    ╚═════╝
 ART
   printf '%s' "$RESET"
   printf '  %sa forja de agentes opencode%s\n' "$MUTED" "$RESET"
-  printf '  %sinstalador Linux · user-space · sem sudo%s\n' "$DIM" "$RESET"
+  printf '  %sinstalador Linux · user-space · sem sudo%s\n\n' "$DIM" "$RESET"
 }
 
 need() {
   command -v "$1" >/dev/null 2>&1 || die "faltando: $1"
+}
+
+check_space() {
+  mkdir -p "$HEFESTO_HOME"
+  local avail_kb
+  avail_kb="$(df -Pk "$HEFESTO_HOME" | awk 'NR == 2 {print $4}')"
+  if [ -n "$avail_kb" ] && [ "$avail_kb" -lt 900000 ]; then
+    die "espaço insuficiente em $HEFESTO_HOME: $((avail_kb / 1024)) MB livres; libere pelo menos ~900 MB."
+  fi
 }
 
 node_ok() {
@@ -85,8 +97,14 @@ install_node() {
 
 install_opencode() {
   step "2/4  opencode"
-  "$NODE_DIR/bin/npm" install -g opencode-ai@latest --prefix "$OPENCODE_PREFIX" \
+  local pkg="opencode-linux-$ARCH"
+  local bin="$OPENCODE_PREFIX/lib/node_modules/$pkg/bin/opencode"
+  rm -rf "$OPENCODE_PREFIX"
+  "$NODE_DIR/bin/npm" install -g "$pkg@latest" --prefix "$OPENCODE_PREFIX" \
     --no-fund --no-audit --loglevel=error || die "falhou a instalação do opencode"
+  [ -x "$bin" ] || die "binário do opencode não encontrado em $bin"
+  mkdir -p "$OPENCODE_PREFIX/bin"
+  ln -sfn "$bin" "$OPENCODE_PREFIX/bin/opencode"
   ok "opencode $("$OPENCODE_PREFIX/bin/opencode" --version) instalado em $OPENCODE_PREFIX"
 }
 
@@ -162,6 +180,7 @@ printf '\n  %sdestino%s  %s\n' "$BOLD" "$RESET" "$HEFESTO_HOME"
 printf '  %smode%s     %s\n' "$BOLD" "$RESET" "$MODE"
 
 TMP="$(mktemp -d)"
+check_space
 
 if [ "$MODE" = "upgrade" ]; then
   step "0/4  verificando dependências"
