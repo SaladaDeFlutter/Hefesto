@@ -19,20 +19,27 @@ e as engines das instâncias são separadas: nenhuma credencial ou conector vaza
 - Conectores MCP por instância, com configuração guiada, credenciais mascaradas e status real.
 - Conector Discord com 34 ferramentas, convite de bot e bridge inbound para menções/DMs.
 - Servidor local com API HTTP, proxy SSE/HTTP e banner ASCII no terminal.
+- Instaladores Linux e Windows em user-space, sem sudo/admin.
 - `npm start` detecta a porta ocupada e pergunta se pode encerrar o processo atual.
 
 ## Requisitos
 
-- Node.js 26 ou superior
-- npm
-- binário `opencode` disponível no `PATH`
+Para instalar pelo bootstrap:
 
-## Instalação no Linux
+- Linux x86_64/arm64 com `curl`, `tar` e `gzip`
+- ou Windows 10/11 x64/arm64 com PowerShell 5.1+
+- conexão com a internet
 
-### Usuário sem nada (recomendado)
+Node.js, npm e opencode **não** precisam estar instalados; o bootstrap instala tudo em user-space.
 
-Requisitos mínimos: Linux x86_64/arm64 com `curl`, `tar` e `gzip`. O bootstrap instala tudo em `~/.hefesto`, sem
-sudo: Node 26 portátil, `opencode-ai`, o código do Hefesto, a build da web e o comando `hefesto`.
+Para rodar direto do código-fonte: Node.js 26+, npm e o binário `opencode` no `PATH`.
+
+## Instalação
+
+### Linux
+
+O bootstrap instala tudo em `~/.hefesto`, sem sudo: Node 26 portátil, opencode da arquitetura correta, código do
+Hefesto, build da web e o comando `hefesto`.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SaladaDeFlutter/Hefesto/refs/heads/main/scripts/bootstrap.sh | bash
@@ -62,47 +69,13 @@ Para atualizar:
 hefesto upgrade
 ```
 
-O upgrade baixa a versão atual do repositório, rebuilda e troca o código. A instalação ocupa aproximadamente 500 MB.
+O upgrade baixa a versão atual do repositório, rebuilda e troca o código. A instalação ocupa aproximadamente 600 MB.
 Você pode trocar o destino com `HEFESTO_HOME` e o diretório do comando com `HEFESTO_BIN_DIR`.
 
-### Desenvolvedor / checkout
+### Windows
 
-Para trabalhar no código:
-
-```bash
-git clone https://github.com/SaladaDeFlutter/Hefesto.git
-cd Hefesto
-./scripts/install.sh
-```
-
-O instalador roda o build, cria o comando `hefesto` em `~/.local/bin` e deixa o upgrade ligado ao git. Nesse modo,
-`hefesto upgrade` faz `git pull --ff-only`, `npm install` e `npm run build`.
-
-Instalações feitas a partir do checkout usam `./data`. O bootstrap e o pacote npm usam `~/.local/share/hefesto` por
-padrão; defina `HEFESTO_DATA_DIR` para escolher outro diretório.
-
-### Pacote npm
-
-Depois de publicado, o pacote pode ser instalado globalmente:
-
-```bash
-npm install -g @saladadeflutter/hefesto
-```
-
-Para gerar e instalar um pacote local com a web já buildada:
-
-```bash
-npm run build
-npm pack
-npm install -g ./saladadeflutter-hefesto-0.0.0.tgz
-```
-
-Nesse modo, `hefesto upgrade` usa `npm install -g @saladadeflutter/hefesto@latest`.
-
-## Instalação no Windows
-
-Windows nativo não executa `bash`, então o entrypoint é PowerShell. O fluxo é o mesmo do Linux: Node portátil,
-opencode, código do Hefesto, build, comando e upgrade.
+Windows nativo não executa `bash`, então o entrypoint é PowerShell. O fluxo é o mesmo: Node portátil, opencode,
+código do Hefesto, build, comando e upgrade.
 
 Abra o PowerShell e rode:
 
@@ -126,6 +99,42 @@ hefesto upgrade
 ```
 
 Feche o Hefesto antes de rodar o upgrade no Windows. O upgrade usa o `bootstrap.ps1` local e não depende de git.
+
+### Desenvolvedor / checkout
+
+Para trabalhar no código no Linux/macOS:
+
+```bash
+git clone https://github.com/SaladaDeFlutter/Hefesto.git
+cd Hefesto
+./scripts/install.sh
+```
+
+O instalador roda o build, cria o comando `hefesto` em `~/.local/bin` e deixa o upgrade ligado ao git. Nesse modo,
+`hefesto upgrade` faz `git pull --ff-only`, `npm install` e `npm run build`.
+
+No Windows, use `npm install`, `npm run build` e `npm start` para rodar a partir do checkout.
+
+Instalações feitas a partir do checkout usam `./data`. O bootstrap e o pacote npm usam `~/.local/share/hefesto` no
+Linux e `%LOCALAPPDATA%\Hefesto` no Windows por padrão; defina `HEFESTO_DATA_DIR` para escolher outro diretório.
+
+### Pacote npm
+
+O pacote ainda não está publicado. Quando estiver, poderá ser instalado globalmente:
+
+```bash
+npm install -g @saladadeflutter/hefesto
+```
+
+Para gerar e instalar um pacote local com a web já buildada:
+
+```bash
+npm run build
+npm pack
+npm install -g ./saladadeflutter-hefesto-0.0.0.tgz
+```
+
+Nesse modo, `hefesto upgrade` usa `npm install -g @saladadeflutter/hefesto@latest`.
 
 ## Como rodar
 
@@ -229,7 +238,7 @@ O servidor carrega automaticamente o arquivo `.env` da raiz.
 | `PORT` | `4100` | Porta da interface web. |
 | `OPENCODE_BIN` | `opencode` no PATH | Binário do motor. |
 | `HEFESTO_MODEL` | automático | Modelo padrão no formato `provedor/modelo`. |
-| `HEFESTO_DATA_DIR` | `./data` no checkout; `~/.local/share/hefesto` no CLI global | Diretório de persistência. |
+| `HEFESTO_DATA_DIR` | `./data` no checkout; `~/.local/share/hefesto` no Linux instalado; `%LOCALAPPDATA%\Hefesto` no Windows | Diretório de persistência. |
 
 ## Persistência e segredos
 
@@ -288,7 +297,7 @@ data/                instâncias, catálogo e engines isoladas (ignorado pelo gi
 | `./scripts/bootstrap.sh` | Instala Node, opencode e Hefesto no Linux em user-space. |
 | `scripts/bootstrap.ps1` | Instala Node, opencode e Hefesto no Windows em user-space. |
 | `hefesto` | Inicia a build instalada, com banner ASCII e navegador. |
-| `hefesto upgrade` | Atualiza o checkout e rebuilda a aplicação. |
+| `hefesto upgrade` | Atualiza via bootstrap, git ou npm conforme a instalação. |
 | `npm start` | Builda a web e inicia o servidor; pergunta antes de encerrar um processo na porta. |
 | `npm run start:server` | Inicia o servidor sem rebuildar a web. |
 | `npm run dev` | Alias de `npm start`. |
