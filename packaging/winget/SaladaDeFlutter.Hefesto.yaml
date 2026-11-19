@@ -1,0 +1,47 @@
+PackageIdentifier: SaladaDeFlutter.Hefesto
+PackageVersion: 2026.11.18
+PackageLocale: pt-BR
+Publisher: SaladaDeFlutter
+PublisherUrl: https://github.com/SaladaDeFlutter
+PublisherSupportUrl: https://github.com/SaladaDeFlutter/Hefesto/issues
+PackageName: Hefesto
+PackageUrl: https://github.com/SaladaDeFlutter/Hefesto
+License: Proprietary
+ShortDescription: A forja local de agentes opencode com chat, modelos e conectores MCP.
+Description: Hefesto roda instâncias isoladas do opencode com chat, seleção de modelo e conectores MCP, servindo a interface web local em http://127.0.0.1:4100.
+Moniker: hefesto
+Tags:
+  - opencode
+  - ai
+  - agents
+  - mcp
+  - cli
+Installers:
+  - Architecture: x64
+    InstallerType: nullsoft
+    InstallerUrl: https://github.com/SaladaDeFlutter/Hefesto/releases/download/v2026.11.18/Hefesto-Setup-x64.exe
+    InstallerSha256: 39FB90FBCB23AD2FF5E08C9993BD7E40A584A8A62973C88C5EB62B903C44CCFA
+    InstallerSwitches:
+      Silent: /S
+      SilentWithProgress: /S
+    Scope: user
+    InstallModes:
+      - interactive
+      - silent
+      - silentWithProgress
+    UpgradeBehavior: install
+  - Architecture: arm64
+    InstallerType: nullsoft
+    InstallerUrl: https://github.com/SaladaDeFlutter/Hefesto/releases/download/v2026.11.18/Hefesto-Setup-arm64.exe
+    InstallerSha256: 5A7656BE8D5F3B73D57FFF3F143F755D36B762F59EC709EA27747CA08B2CF64D
+    InstallerSwitches:
+      Silent: /S
+      SilentWithProgress: /S
+    Scope: user
+    InstallModes:
+      - interactive
+      - silent
+      - silentWithProgress
+    UpgradeBehavior: install
+ManifestType: singleton
+ManifestVersion: 1.12.0

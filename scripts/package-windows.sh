@@ -14,6 +14,7 @@ esac
 NODE_CHANNEL="${NODE_CHANNEL:-latest-v26.x}"
 OPENCODE_VERSION="${OPENCODE_VERSION:-1.19.6}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
+VERSION="${HEFESTO_VERSION:-$(node -e 'console.log(require(process.argv[1] + "/package.json").version)' "$ROOT")}"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -93,7 +94,7 @@ printf '%s\r\n' \
   >"$APP/hefesto.cmd"
 
 printf '%s\r\n' \
-  'Hefesto portátil para Windows' \
+  'Hefesto para Windows' \
   '' \
   'Execute hefesto.cmd para abrir o Hefesto.' \
   'O navegador abre sozinho em http://127.0.0.1:4100' \
@@ -110,3 +111,20 @@ rm -f "$ZIP"
 echo
 echo "$ZIP"
 sha256sum "$ZIP"
+
+if command -v makensis >/dev/null 2>&1; then
+  echo
+  echo "> instalador NSIS (win-$ARCH, versão $VERSION)"
+  SETUP="$OUT_DIR/Hefesto-Setup-$ARCH.exe"
+  rm -f "$SETUP"
+  makensis -V2 \
+    -DAPP_SOURCE="$APP" \
+    -DAPP_VERSION="$VERSION" \
+    -DAPP_ARCH="$ARCH" \
+    -DOUTFILE="$SETUP" \
+    "$ROOT/scripts/installer.nsi"
+  echo "$SETUP"
+  sha256sum "$SETUP"
+else
+  echo "! makensis não encontrado; instalador .exe não foi gerado" >&2
+fi
