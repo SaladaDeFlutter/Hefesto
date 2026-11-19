@@ -72,12 +72,28 @@ hefesto upgrade
 O upgrade baixa a versão atual do repositório, rebuilda e troca o código. A instalação ocupa aproximadamente 600 MB.
 Você pode trocar o destino com `HEFESTO_HOME` e o diretório do comando com `HEFESTO_BIN_DIR`.
 
-### Windows
+### Windows (portátil, sem pré-requisitos)
 
-Windows nativo não executa `bash`, então o entrypoint é PowerShell. O fluxo é o mesmo: Node portátil, opencode,
-código do Hefesto, build, comando e upgrade.
+Esta versão já inclui Node 26 e opencode: não precisa de nada instalado e não executa nenhum script, então não
+esbarra em bloqueio de antivírus/ExecutionPolicy. No `cmd` (Windows 10 1803+ ou 11), rode:
 
-Abra o PowerShell e rode:
+```cmd
+curl.exe -L -o "%TEMP%\hefesto.zip" https://github.com/SaladaDeFlutter/Hefesto/releases/latest/download/hefesto-windows-x64.zip && tar.exe -xf "%TEMP%\hefesto.zip" -C "%LOCALAPPDATA%" && "%LOCALAPPDATA%\Hefesto\hefesto.cmd"
+```
+
+Em Windows arm64, troque `x64` por `arm64` na URL. Depois disso, para abrir de novo:
+
+```cmd
+%LOCALAPPDATA%\Hefesto\hefesto.cmd
+```
+
+O ZIP fica em `%LOCALAPPDATA%\Hefesto` (cerca de 140 MB extraídos), sem admin. Para ter o comando `hefesto` em
+qualquer pasta, crie um atalho para `hefesto.cmd` ou adicione `%LOCALAPPDATA%\Hefesto` ao Path do usuário.
+
+### Windows via PowerShell
+
+Alternativa que instala em `%USERPROFILE%\.hefesto` e cria o comando em `%USERPROFILE%\.local\bin\hefesto.cmd`.
+Algumas políticas de antivírus bloqueiam `irm | iex`; nesse caso use a versão portátil acima.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/SaladaDeFlutter/Hefesto/refs/heads/main/scripts/bootstrap.ps1 | iex"
@@ -88,9 +104,6 @@ Depois abra um novo terminal:
 ```powershell
 hefesto
 ```
-
-O instalador cria `%USERPROFILE%\.local\bin\hefesto.cmd`, adiciona ao PATH do usuário e instala tudo em
-`%USERPROFILE%\.hefesto`, sem precisar de administrador. Suporta Windows x64 e arm64.
 
 Para atualizar:
 
@@ -296,6 +309,7 @@ data/                instâncias, catálogo e engines isoladas (ignorado pelo gi
 | --- | --- |
 | `./scripts/bootstrap.sh` | Instala Node, opencode e Hefesto no Linux em user-space. |
 | `scripts/bootstrap.ps1` | Instala Node, opencode e Hefesto no Windows em user-space. |
+| `./scripts/package-windows.sh [x64\|arm64]` | Gera o ZIP portátil de Windows em `dist/` (Node + opencode inclusos). |
 | `hefesto` | Inicia a build instalada, com banner ASCII e navegador. |
 | `hefesto upgrade` | Atualiza via bootstrap, git ou npm conforme a instalação. |
 | `npm start` | Builda a web e inicia o servidor; pergunta antes de encerrar um processo na porta. |
