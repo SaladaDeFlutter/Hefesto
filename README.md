@@ -24,15 +24,11 @@ e as engines das instâncias são separadas: nenhuma credencial ou conector vaza
 
 ## Requisitos
 
-Para instalar pelo bootstrap:
+- **Windows 10/11 x64/arm64:** nada além do instalador.
+- **Linux x86_64/arm64:** `curl`, `tar`, `gzip` e conexão com a internet para o bootstrap.
+- **Código-fonte:** Node.js 26+, npm e o binário `opencode` no `PATH`.
 
-- Linux x86_64/arm64 com `curl`, `tar` e `gzip`
-- ou Windows 10/11 x64/arm64 com PowerShell 5.1+
-- conexão com a internet
-
-Node.js, npm e opencode **não** precisam estar instalados; o bootstrap instala tudo em user-space.
-
-Para rodar direto do código-fonte: Node.js 26+, npm e o binário `opencode` no `PATH`.
+O instalador do Windows e o bootstrap do Linux já incluem Node.js e opencode.
 
 ## Instalação
 
@@ -91,39 +87,6 @@ winget install SaladaDeFlutter.Hefesto
 > O `.exe` ainda não é assinado com certificado de código; o SmartScreen pode pedir
 > "Mais informações → Executar assim mesmo". A assinatura é o próximo passo para remover esse aviso.
 
-#### Alternativa portátil (ZIP)
-
-Se preferir não usar instalador, no `cmd` (Windows 10 1803+ ou 11):
-
-```cmd
-curl.exe -L -o "%TEMP%\hefesto.zip" https://github.com/SaladaDeFlutter/Hefesto/releases/latest/download/hefesto-windows-x64.zip && tar.exe -xf "%TEMP%\hefesto.zip" -C "%LOCALAPPDATA%" && "%LOCALAPPDATA%\Hefesto\hefesto.cmd"
-```
-
-Em Windows arm64, troque `x64` por `arm64` na URL. Depois abra `%LOCALAPPDATA%\Hefesto\hefesto.cmd`.
-
-### Windows via PowerShell
-
-Alternativa que instala em `%USERPROFILE%\.hefesto` e cria o comando em `%USERPROFILE%\.local\bin\hefesto.cmd`.
-Algumas políticas de antivírus bloqueiam `irm | iex`; nesse caso use o instalador acima.
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/SaladaDeFlutter/Hefesto/refs/heads/main/scripts/bootstrap.ps1 | iex"
-```
-
-Depois abra um novo terminal:
-
-```powershell
-hefesto
-```
-
-Para atualizar:
-
-```powershell
-hefesto upgrade
-```
-
-Feche o Hefesto antes de rodar o upgrade no Windows. O upgrade usa o `bootstrap.ps1` local e não depende de git.
-
 ### Desenvolvedor / checkout
 
 Para trabalhar no código no Linux/macOS:
@@ -139,29 +102,11 @@ O instalador roda o build, cria o comando `hefesto` em `~/.local/bin` e deixa o 
 
 No Windows, use `npm install`, `npm run build` e `npm start` para rodar a partir do checkout.
 
-Instalações feitas a partir do checkout usam `./data`. O bootstrap e o pacote npm usam `~/.local/share/hefesto` no
-Linux e `%LOCALAPPDATA%\Hefesto` no Windows por padrão; defina `HEFESTO_DATA_DIR` para escolher outro diretório.
-
-### Pacote npm
-
-O pacote ainda não está publicado. Quando estiver, poderá ser instalado globalmente:
-
-```bash
-npm install -g @saladadeflutter/hefesto
-```
-
-Para gerar e instalar um pacote local com a web já buildada:
-
-```bash
-npm run build
-npm pack
-npm install -g ./saladadeflutter-hefesto-0.0.0.tgz
-```
-
-Nesse modo, `hefesto upgrade` usa `npm install -g @saladadeflutter/hefesto@latest`.
+Instalações feitas a partir do checkout usam `./data`. O bootstrap do Linux usa `~/.local/share/hefesto` e o
+instalador do Windows usa `%LOCALAPPDATA%\Hefesto` por padrão; defina `HEFESTO_DATA_DIR` para escolher outro
+diretório.
 
 ## Como rodar
-
 
 ```bash
 npm install
@@ -310,9 +255,8 @@ packages/core        orquestrador, isolamento de ambiente, health check e regist
 packages/server      API HTTP, proxy /oc/i/:id, estáticos e banner ASCII
 packages/web         React + Vite: landing, onboarding, painel, chat, conectores e ajustes
 packages/connectors  catálogo MCP e conector Discord local (stdio + bridge inbound)
-scripts              bootstrap Linux/Windows, instalador NSIS, empacotamento Windows, smoke e porta
+scripts              bootstrap Linux, instalador NSIS, empacotamento Windows, smoke e porta
 packaging/winget     manifesto do Windows Package Manager
-.github/workflows    release automático dos instaladores Windows
 data/                instâncias, catálogo e engines isoladas (ignorado pelo git)
 ```
 
@@ -321,11 +265,10 @@ data/                instâncias, catálogo e engines isoladas (ignorado pelo gi
 | Comando | O que faz |
 | --- | --- |
 | `./scripts/bootstrap.sh` | Instala Node, opencode e Hefesto no Linux em user-space. |
-| `scripts/bootstrap.ps1` | Instala Node, opencode e Hefesto no Windows em user-space. |
-| `./scripts/package-windows.sh [x64\|arm64]` | Gera o ZIP portátil e o instalador `.exe` de Windows em `dist/` (Node + opencode inclusos). |
+| `./scripts/package-windows.sh [x64\|arm64]` | Gera o instalador `.exe` de Windows em `dist/` (Node + opencode inclusos). |
 | `scripts/installer.nsi` | Script do instalador NSIS (atalhos, Path do usuário e desinstalador). |
 | `hefesto` | Inicia a build instalada, com banner ASCII e navegador. |
-| `hefesto upgrade` | Atualiza via bootstrap, git ou npm conforme a instalação. |
+| `hefesto upgrade` | Atualiza conforme a instalação (git, bootstrap ou instalador). |
 | `npm start` | Builda a web e inicia o servidor; pergunta antes de encerrar um processo na porta. |
 | `npm run start:server` | Inicia o servidor sem rebuildar a web. |
 | `npm run dev` | Alias de `npm start`. |
