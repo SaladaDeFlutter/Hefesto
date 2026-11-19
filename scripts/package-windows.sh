@@ -24,6 +24,8 @@ mkdir -p "$APP/packages"
 cp -R "$ROOT/bin" "$ROOT/scripts" "$ROOT/docs" "$APP/"
 cp "$ROOT/README.md" "$ROOT/package.json" "$ROOT/package-lock.json" "$ROOT/.env.example" "$APP/"
 
+node -e 'const fs = require("fs"); const file = process.argv[1] + "/package.json"; const pkg = JSON.parse(fs.readFileSync(file, "utf8")); pkg.version = process.argv[2]; fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n")' "$APP" "$VERSION"
+
 for pkg in core engine server connectors; do
   cp -R "$ROOT/packages/$pkg" "$APP/packages/$pkg"
 done

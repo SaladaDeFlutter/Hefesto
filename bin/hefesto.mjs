@@ -18,6 +18,9 @@ try {
 
 const port = Number(process.env.PORT ?? 4100);
 const isSourceCheckout = existsSync(resolve(root, ".git"));
+const isPackaged =
+  existsSync(resolve(root, "node", process.platform === "win32" ? "node.exe" : "node")) &&
+  existsSync(resolve(root, "opencode"));
 const dataDir =
   process.env.HEFESTO_DATA_DIR ??
   (isSourceCheckout
@@ -41,7 +44,7 @@ Opções:
   --dry-run               no upgrade, apenas mostra os comandos
 
 Requisitos:
-  Node.js 26+, npm e opencode no PATH.`);
+  ${isPackaged ? "Esta instalação já inclui Node.js 26 e opencode." : "Node.js 26+, npm e opencode no PATH."}`);
 }
 
 function run(cmd, cmdArgs, options = {}) {
@@ -121,6 +124,19 @@ async function start() {
 
 async function upgrade() {
   const dryRun = args.includes("--dry-run") || process.env.HEFESTO_UPGRADE_DRY_RUN === "1";
+  if (isPackaged) {
+    const url = "https://github.com/SaladaDeFlutter/Hefesto/releases/latest";
+    if (dryRun) {
+      console.log(url);
+      return;
+    }
+    console.log(
+      `Esta instalação veio do instalador do Windows.\n` +
+        `Baixe a versão mais recente em ${url}\n` +
+        `O instalador roda por cima e mantém seus dados.`,
+    );
+    return;
+  }
   if (process.env.HEFESTO_BOOTSTRAP === "1") {
     const windows = process.platform === "win32";
     const script =

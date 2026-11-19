@@ -20,7 +20,7 @@ Installers:
   - Architecture: x64
     InstallerType: nullsoft
     InstallerUrl: https://github.com/SaladaDeFlutter/Hefesto/releases/download/v2026.11.18/Hefesto-Setup-x64.exe
-    InstallerSha256: 39FB90FBCB23AD2FF5E08C9993BD7E40A584A8A62973C88C5EB62B903C44CCFA
+    InstallerSha256: B55708B624E800A9AA66241C69F6441CDA15DD7993DEE9A2D70DF75A1ED0F44E
     InstallerSwitches:
       Silent: /S
       SilentWithProgress: /S
@@ -33,7 +33,7 @@ Installers:
   - Architecture: arm64
     InstallerType: nullsoft
     InstallerUrl: https://github.com/SaladaDeFlutter/Hefesto/releases/download/v2026.11.18/Hefesto-Setup-arm64.exe
-    InstallerSha256: 5A7656BE8D5F3B73D57FFF3F143F755D36B762F59EC709EA27747CA08B2CF64D
+    InstallerSha256: 28D8BA57A6B1B016F926DB4FDFECFAB9EF61DBEFD249C2FB40C182AAAA984C8D
     InstallerSwitches:
       Silent: /S
       SilentWithProgress: /S
