@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync } from "node:fs";
 import { delimiter, dirname, extname, resolve } from "node:path";
@@ -192,7 +192,8 @@ function quoteForCmd(value: string): string {
 /** On Windows the spawned process may be a `cmd.exe` wrapper, so kill the tree. */
 function killProcess(child: ChildProcess, force: boolean): void {
   if (process.platform === "win32" && child.pid) {
-    spawn("taskkill", ["/pid", String(child.pid), "/T", ...(force ? ["/F"] : [])], {
+    // spawnSync so no handle is left open when the host process exits.
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
       stdio: "ignore",
       windowsHide: true,
     });

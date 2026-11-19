@@ -140,7 +140,8 @@ export class OpenCodeClient {
   }
 
   async listProviders(): Promise<{ providers: ProviderInfo[] }> {
-    return this.request("GET", "/config/providers");
+    const data = await this.request<unknown>("GET", "/config/providers");
+    return { providers: normalizeProviders(data) };
   }
 
   async listAgents(): Promise<unknown[]> {
@@ -234,4 +235,27 @@ export class OpenCodeClient {
     })().catch(() => {});
     return () => ac.abort();
   }
+}
+
+function normalizeProviders(data: unknown): ProviderInfo[] {
+  if (Array.isArray(data)) return data.filter(isProviderInfo);
+  if (!data || typeof data !== "object") return [];
+  const record = data as Record<string, unknown>;
+  for (const key of ["providers", "all", "list"]) {
+    const value = record[key];
+    if (Array.isArray(value)) return value.filter(isProviderInfo);
+    if (value && typeof value === "object") return providerMap(value);
+  }
+  return providerMap(record);
+}
+
+function providerMap(value: object): ProviderInfo[] {
+  return Object.entries(value as Record<string, unknown>)
+    .filter(([, entry]) => isProviderInfo(entry))
+    .map(([id, entry]) => ({ ...(entry as ProviderInfo), id: (entry as ProviderInfo).id ?? id }));
+}
+
+function isProviderInfo(value: unknown): value is ProviderInfo {
+  if (!value || typeof value !== "object") return false;
+  return "id" in value || "models" in value;
 }
