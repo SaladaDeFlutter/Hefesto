@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync } from "node:fs";
 import { delimiter, dirname, extname, resolve } from "node:path";
@@ -63,7 +63,7 @@ export class Hefesto {
     const port = opts.port ?? (await findFreePort());
     const bin = opts.opencodeBin ?? findExecutable("opencode");
 
-    const child = spawn(bin, ["serve", "--port", String(port), "--hostname", "127.0.0.1"], {
+    const child = spawnCommand(bin, ["serve", "--port", String(port), "--hostname", "127.0.0.1"], {
       env: opts.env ?? process.env,
       stdio: ["ignore", "ignore", "inherit"],
     });
@@ -87,7 +87,7 @@ export class Hefesto {
         }
       }
     } catch (e) {
-      child.kill("SIGTERM");
+      killProcess(child, true);
       throw e;
     }
 
@@ -117,7 +117,7 @@ export class Hefesto {
     await new Promise<void>((resolveExit) => {
       const timer = setTimeout(() => {
         try {
-          child.kill("SIGKILL");
+          killProcess(child, true);
         } catch {
           /* already gone */
         }
@@ -126,7 +126,7 @@ export class Hefesto {
         clearTimeout(timer);
         resolveExit();
       });
-      child.kill("SIGTERM");
+      killProcess(child, false);
     });
   }
 
@@ -168,6 +168,37 @@ export class Hefesto {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Windows cannot spawn `.cmd`/`.bat` shims directly (Node returns EINVAL), so
+ * route them through `cmd.exe` the same way Node's `shell: true` does.
+ */
+function spawnCommand(bin: string, args: string[], options: SpawnOptions): ChildProcess {
+  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(bin)) {
+    const command = [bin, ...args].map(quoteForCmd).join(" ");
+    return spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `"${command}"`], {
+      ...options,
+      windowsVerbatimArguments: true,
+    });
+  }
+  return spawn(bin, args, options);
+}
+
+function quoteForCmd(value: string): string {
+  return /[\s"&|<>^()]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+/** On Windows the spawned process may be a `cmd.exe` wrapper, so kill the tree. */
+function killProcess(child: ChildProcess, force: boolean): void {
+  if (process.platform === "win32" && child.pid) {
+    spawn("taskkill", ["/pid", String(child.pid), "/T", ...(force ? ["/F"] : [])], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
+  child.kill(force ? "SIGKILL" : "SIGTERM");
 }
 
 function findFreePort(): Promise<number> {
