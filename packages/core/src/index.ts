@@ -17,6 +17,7 @@ export interface HefestoOptions {
   port?: number;
   connectors?: ConnectorLaunch[];
   env?: Record<string, string>;
+  cwd?: string;
 }
 
 export interface HefestoStatus {
@@ -66,6 +67,7 @@ export class Hefesto {
     const child = spawnCommand(bin, ["serve", "--port", String(port), "--hostname", "127.0.0.1"], {
       env: opts.env ?? process.env,
       stdio: ["ignore", "ignore", "inherit"],
+      ...(opts.cwd ? { cwd: opts.cwd } : {}),
     });
 
     const baseUrl = `http://127.0.0.1:${port}`;

@@ -94,7 +94,7 @@ export default function Connectors() {
           definitionId: definition.id,
           enabled: true,
         }),
-      `${definition.name} adicionado a esta instância`,
+      `${definition.name} adicionado a este agente`,
     ).then((ok) => {
       if (!ok) return;
       setShowCatalog(false);
@@ -105,7 +105,7 @@ export default function Connectors() {
   function addCustom(input: ConnectorInput) {
     void run(
       () => api.addInstanceConnector(id, input),
-      `${input.alias} adicionado a esta instância`,
+      `${input.alias} adicionado a este agente`,
     ).then((ok) => {
       if (!ok || !input.alias) return;
       setShowCatalog(false);
@@ -127,26 +127,26 @@ export default function Connectors() {
       className="page"
       style={instance ? ({ "--accent": instance.accent } as CSSProperties) : undefined}
     >
-      <TopBar right={<InstanceNav instanceId={id} active="conectores" />} />
+      <TopBar right={<InstanceNav instanceId={id} active="ferramentas" />} />
 
       <main className="connectors-page connectors-home">
         <div className="connectors-crumb">
-          <Link to={`/i/${id}`}>← painel</Link>
+          <Link to={`/i/${id}/painel`}>← painel</Link>
           <span aria-hidden="true">/</span>
-          <strong>conectores</strong>
+          <strong>Ferramentas</strong>
         </div>
 
         <header className="connectors-hero">
           <div>
-            <span className="connectors-kicker">instância · {instance?.name ?? "carregando"}</span>
-            <h1>Conectores</h1>
+            <span className="connectors-kicker">Agente · {instance?.name ?? "Carregando"}</span>
+            <h1>Ferramentas</h1>
             <p>
-              Ferramentas MCP instaladas em <strong>{instance?.name ?? "esta instância"}</strong>.
-              Abra um conector para configurar credenciais, convidar o bot e conectar.
+              Ferramentas MCP deste agente. Abra uma ferramenta para configurar credenciais,
+              convidar o bot e conectar.
             </p>
           </div>
           <button className="btn primary" type="button" onClick={() => openCatalog()}>
-            adicionar conector
+            Adicionar ferramenta
           </button>
         </header>
 
@@ -157,11 +157,11 @@ export default function Connectors() {
           <div className="connectors-home-summary">
             <span>
               <strong>{connectors.length}</strong>{" "}
-              {connectors.length === 1 ? "instalado" : "instalados"}
+              {connectors.length === 1 ? "instalada" : "instaladas"}
             </span>
             <span className={connectedCount > 0 ? "is-ok" : undefined}>
               <strong>{connectedCount}</strong>{" "}
-              {connectedCount === 1 ? "ativo" : "ativos"}
+              {connectedCount === 1 ? "ativa" : "ativas"}
             </span>
             {attentionCount > 0 && (
               <span className="is-warn">
@@ -177,13 +177,13 @@ export default function Connectors() {
             <span className="connector-empty-mark" aria-hidden="true">
               ⛓
             </span>
-            <strong>Nenhum conector instalado</strong>
+            <strong>Nenhuma ferramenta instalada</strong>
             <p>
-              Instale um conector do catálogo para dar novas ferramentas a esta instância.
+              Instale uma ferramenta do catálogo para dar novos recursos a este agente.
             </p>
             <div className="row">
               <button className="btn primary" type="button" onClick={() => openCatalog()}>
-                explorar catálogo
+                Explorar catálogo
               </button>
               <button className="btn ghost" type="button" onClick={() => openCatalog("advanced")}>
                 MCP próprio
@@ -194,8 +194,8 @@ export default function Connectors() {
           <section className="connectors-home-section" aria-labelledby="installed-connectors-title">
             <div className="connectors-home-section-head">
               <div>
-                <h2 id="installed-connectors-title">Instalados</h2>
-                <p className="muted small">Clique em um conector para abrir a configuração.</p>
+                <h2 id="installed-connectors-title">Instaladas</h2>
+                <p className="muted small">Clique em uma ferramenta para abrir a configuração.</p>
               </div>
             </div>
             <div className="connectors-home-grid">
@@ -216,13 +216,13 @@ export default function Connectors() {
               ＋
             </span>
             <span>
-              <strong>Catálogo de conectores</strong>
+              <strong>Catálogo de ferramentas</strong>
               <span className="muted small">
                 {available.length} {available.length === 1 ? "disponível" : "disponíveis"} para
                 instalar
               </span>
             </span>
-            <span className="connector-alert-action">explorar</span>
+            <span className="connector-alert-action">Explorar</span>
           </button>
         )}
       </main>

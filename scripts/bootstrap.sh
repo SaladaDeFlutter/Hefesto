@@ -158,6 +158,31 @@ add_path() {
   printf '\n# >>> hefesto >>>\nexport PATH="%s:$PATH"\n# <<< hefesto <<<\n' "$BIN_DIR" >> "$file"
 }
 
+install_desktop_entry() {
+  if [ "${HEFESTO_NO_DESKTOP:-0}" = "1" ]; then return 0; fi
+  local data_home icon_dir apps_dir
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  icon_dir="$data_home/icons/hicolor/scalable/apps"
+  apps_dir="$data_home/applications"
+  mkdir -p "$icon_dir" "$apps_dir"
+  cp "$SRC_DIR/docs/hefesto-icon.svg" "$icon_dir/hefesto.svg"
+  cat > "$apps_dir/hefesto.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Hefesto
+Comment=A forja de agentes opencode
+Exec="$TARGET" open
+Icon=hefesto
+Terminal=false
+Categories=Development;
+StartupNotify=false
+DESKTOP
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$apps_dir" >/dev/null 2>&1 || true
+  fi
+  ok "atalho criado em $apps_dir/hefesto.desktop"
+}
+
 case "$(uname -s)" in
   Linux) ;;
   *) die "este instalador é Linux-only por enquanto" ;;
@@ -195,6 +220,7 @@ fi
 export PATH="$NODE_DIR/bin:$OPENCODE_PREFIX/bin:$PATH"
 install_hefesto
 install_command
+install_desktop_entry
 
 printf '\n%s  Hefesto pronto.%s\n\n' "$GREEN$BOLD" "$RESET"
 printf '  %shefesto%s          inicia e abre o navegador\n' "$AMBER" "$RESET"

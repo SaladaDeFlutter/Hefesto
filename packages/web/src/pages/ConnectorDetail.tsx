@@ -69,7 +69,7 @@ export default function ConnectorDetail() {
       <div className="page">
         <TopBar />
         <main className="connector-detail-page">
-          <p className="muted">carregando conector...</p>
+          <p className="muted">Carregando ferramenta...</p>
         </main>
       </div>
     );
@@ -82,7 +82,7 @@ export default function ConnectorDetail() {
           <TopBar
             right={
               <Link className="btn ghost small" to={`/i/${id}/conectores`}>
-                conectores
+                ferramentas
               </Link>
             }
           />
@@ -100,11 +100,11 @@ export default function ConnectorDetail() {
       className="page"
       style={instance ? ({ "--accent": instance.accent } as CSSProperties) : undefined}
     >
-      <TopBar right={<InstanceNav instanceId={id} active="conectores" />} />
+      <TopBar right={<InstanceNav instanceId={id} active="ferramentas" />} />
 
       <main className="connector-detail-page">
         <div className="connectors-crumb">
-          <Link to={`/i/${id}/conectores`}>← conectores</Link>
+          <Link to={`/i/${id}/conectores`}>← ferramentas</Link>
           <span aria-hidden="true">/</span>
           <strong>{connector.alias}</strong>
         </div>
@@ -114,9 +114,9 @@ export default function ConnectorDetail() {
             <ConnectorIcon icon={connector.icon} name={connector.name ?? connector.alias} />
           </span>
           <div className="connector-detail-hero-copy">
-            <span className="connectors-kicker">conector · {instance?.name ?? "instância"}</span>
+            <span className="connectors-kicker">Conector MCP · {instance?.name ?? "Agente"}</span>
             <h1>{connector.name}</h1>
-            <p>{connector.description ?? "Conector MCP personalizado desta instância."}</p>
+            <p>{connector.description ?? "Conector MCP personalizado deste agente."}</p>
           </div>
           <div className="connector-detail-hero-status">
             <ConnectorStatusBadge connector={connector} />
@@ -136,13 +136,13 @@ export default function ConnectorDetail() {
           onConnect={() =>
             void run(
               () => api.toggleInstanceConnector(id, connector.alias, "connect"),
-              "conector conectado",
+              "Ferramenta conectada",
             )
           }
           onDisconnect={() =>
             void run(
               () => api.toggleInstanceConnector(id, connector.alias, "disconnect"),
-              "conector desconectado",
+              "Ferramenta desconectada",
             )
           }
           onToggleEnabled={() =>
@@ -153,14 +153,14 @@ export default function ConnectorDetail() {
                   transport: connector.transport,
                   enabled: !connector.enabled,
                 }),
-              connector.enabled ? "conector desativado" : "conector ativado",
+              connector.enabled ? "Ferramenta desativada" : "Ferramenta ativada",
             )
           }
           onRemove={() => {
-            if (!window.confirm(`Remover o conector ${connector.alias}?`)) return;
+            if (!window.confirm(`Remover a ferramenta ${connector.alias}?`)) return;
             void run(
               () => api.removeInstanceConnector(id, connector.alias),
-              "conector removido",
+              "Ferramenta removida",
             ).then((ok) => {
               if (ok) navigate(`/i/${id}/conectores`);
             });

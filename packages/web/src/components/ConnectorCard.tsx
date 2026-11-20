@@ -17,7 +17,7 @@ export default function ConnectorCard({
     <Link
       className={`connector-card${needsAttention ? " attention" : ""}`}
       to={to}
-      aria-label={`Abrir conector ${connector.name}`}
+      aria-label={`Abrir ferramenta ${connector.name}`}
     >
       <span className="connector-card-icon">
         <ConnectorIcon icon={connector.icon} name={connector.name ?? connector.alias} />

@@ -34,8 +34,29 @@ exec node "$ROOT/bin/hefesto.mjs" "\$@"
 EOF
 chmod +x "$TARGET"
 
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+ICON_DIR="${DATA_HOME}/icons/hicolor/scalable/apps"
+APPS_DIR="${DATA_HOME}/applications"
+mkdir -p "$ICON_DIR" "$APPS_DIR"
+cp "$ROOT/docs/hefesto-icon.svg" "$ICON_DIR/hefesto.svg"
+cat > "$APPS_DIR/hefesto.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Hefesto
+Comment=A forja de agentes opencode
+Exec="$TARGET" open
+Icon=hefesto
+Terminal=false
+Categories=Development;
+StartupNotify=false
+DESKTOP
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+fi
+
 printf '\nHefesto instalado em %s\n\n' "$TARGET"
-printf 'Use:\n  hefesto\n  hefesto upgrade\n\n'
+printf 'Use:\n  hefesto\n  hefesto open\n  hefesto stop\n  hefesto upgrade\n\n'
+printf 'Atalho criado em %s\n' "$APPS_DIR/hefesto.desktop"
 case ":${PATH}:" in
   *":${BIN_DIR}:"*) ;;
   *)

@@ -1,6 +1,6 @@
 {
   "name": "@saladadeflutter/hefesto",
-  "version": "0.0.0",
+  "version": "2026.11.19",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -44,7 +44,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "A forja local de agentes opencode: inst\u00e2ncias isoladas, chat, modelos e conectores MCP.",
+  "description": "A forja local de agentes opencode: instâncias isoladas, chat, modelos e conectores MCP.",
   "engines": {
     "node": ">=26"
   }

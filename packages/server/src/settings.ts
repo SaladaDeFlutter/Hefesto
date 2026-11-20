@@ -1,13 +1,16 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+const SETTINGS_VERSION = 1;
+
 export interface Settings {
+  version: number;
   defaultConnectors: string[];
 }
 
 export class SettingsStore {
   private readonly file: string;
-  private data: Settings = { defaultConnectors: [] };
+  private data: Settings = { version: SETTINGS_VERSION, defaultConnectors: [] };
   private loaded = false;
   private queue: Promise<void> = Promise.resolve();
 
@@ -17,12 +20,12 @@ export class SettingsStore {
 
   async get(): Promise<Settings> {
     await this.ensureLoaded();
-    return { defaultConnectors: [...this.data.defaultConnectors] };
+    return { version: SETTINGS_VERSION, defaultConnectors: [...this.data.defaultConnectors] };
   }
 
   async setDefaultConnectors(ids: string[]): Promise<Settings> {
     await this.ensureLoaded();
-    this.data = { defaultConnectors: [...ids] };
+    this.data = { version: SETTINGS_VERSION, defaultConnectors: [...ids] };
     await this.persist();
     return this.get();
   }
@@ -32,13 +35,21 @@ export class SettingsStore {
     this.loaded = true;
     try {
       const raw = JSON.parse(await readFile(this.file, "utf8")) as Partial<Settings>;
-      if (Array.isArray(raw.defaultConnectors)) {
-        this.data.defaultConnectors = raw.defaultConnectors.filter(
-          (id): id is string => typeof id === "string" && Boolean(id.trim()),
-        );
+      const version = Number(raw.version ?? SETTINGS_VERSION);
+      if (version > SETTINGS_VERSION) {
+        console.warn(`[hefesto] settings.json versão ${version}; lendo como ${SETTINGS_VERSION}`);
       }
+      this.data = {
+        version: SETTINGS_VERSION,
+        defaultConnectors: Array.isArray(raw.defaultConnectors)
+          ? raw.defaultConnectors.filter(
+              (id): id is string => typeof id === "string" && Boolean(id.trim()),
+            )
+          : [],
+      };
+      if (raw.version !== SETTINGS_VERSION) await this.persist();
     } catch {
-      this.data = { defaultConnectors: ["discord"] };
+      this.data = { version: SETTINGS_VERSION, defaultConnectors: [] };
       await this.persist();
     }
   }

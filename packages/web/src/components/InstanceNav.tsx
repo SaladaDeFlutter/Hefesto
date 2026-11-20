@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 
-export type InstanceSection = "painel" | "chat" | "conectores" | "ajustes";
+export type InstanceSection = "painel" | "chat" | "ferramentas" | "ajustes";
 
 const ITEMS: Array<{ id: InstanceSection; label: string; path: string }> = [
-  { id: "painel", label: "painel", path: "" },
-  { id: "chat", label: "chat", path: "/chat" },
-  { id: "conectores", label: "conectores", path: "/conectores" },
-  { id: "ajustes", label: "ajustes", path: "/config" },
+  { id: "painel", label: "Painel", path: "/painel" },
+  { id: "chat", label: "Chat", path: "/chat" },
+  { id: "ferramentas", label: "Ferramentas", path: "/conectores" },
+  { id: "ajustes", label: "Ajustes", path: "/config" },
 ];
 
 export default function InstanceNav({
@@ -17,7 +17,7 @@ export default function InstanceNav({
   active: InstanceSection;
 }) {
   return (
-    <nav className="instance-nav" aria-label="Navegação da instância">
+    <nav className="instance-nav" aria-label="Navegação do agente">
       {ITEMS.map((item) => (
         <Link
           key={item.id}

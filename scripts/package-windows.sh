@@ -96,13 +96,34 @@ printf '%s\r\n' \
   >"$APP/hefesto.cmd"
 
 printf '%s\r\n' \
+  'Set fso = CreateObject("Scripting.FileSystemObject")' \
+  'Set sh = CreateObject("WScript.Shell")' \
+  'base = fso.GetParentFolderName(WScript.ScriptFullName)' \
+  'If Not fso.FileExists(base & "\node\node.exe") Then' \
+  '  MsgBox "Node portatil ausente. Extraia o zip novamente.", 16, "Hefesto"' \
+  '  WScript.Quit 1' \
+  'End If' \
+  'Set env = sh.Environment("Process")' \
+  'env("HEFESTO_HOME") = base' \
+  'env("PATH") = base & "\node;" & base & "\opencode;" & env("PATH")' \
+  'q = Chr(34)' \
+  'cmd = q & base & "\node\node.exe" & q & " " & q & base & "\bin\hefesto.mjs" & q & " open"' \
+  'sh.Run cmd, 0, False' \
+  >"$APP/hefesto.vbs"
+
+printf '%s\r\n' \
   'Hefesto para Windows' \
   '' \
-  'Execute hefesto.cmd para abrir o Hefesto.' \
-  'O navegador abre sozinho em http://127.0.0.1:4100' \
+  'Abra pelo atalho Hefesto (Menu Iniciar ou Area de Trabalho).' \
+  'O app roda em segundo plano e abre no navegador.' \
   '' \
-  'Para usar de qualquer pasta, crie um atalho para hefesto.cmd' \
-  'ou adicione esta pasta ao seu PATH de usuário.' \
+  'No terminal:' \
+  '  hefesto' \
+  '  hefesto stop' \
+  '  hefesto status' \
+  '  hefesto upgrade' \
+  '' \
+  'Dados: %LOCALAPPDATA%\Hefesto' \
   >"$APP/LEIA-ME.txt"
 
 mkdir -p "$OUT_DIR"

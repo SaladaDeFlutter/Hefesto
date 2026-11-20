@@ -135,8 +135,8 @@ export class OpenCodeClient {
     return data as T;
   }
 
-  async health(): Promise<{ healthy: boolean; version: string }> {
-    return this.request("GET", "/global/health", undefined, 5_000);
+  async health(timeoutMs = 5_000): Promise<{ healthy: boolean; version: string }> {
+    return this.request("GET", "/global/health", undefined, timeoutMs);
   }
 
   async listProviders(): Promise<{ providers: ProviderInfo[] }> {
@@ -152,9 +152,10 @@ export class OpenCodeClient {
     return this.request("GET", "/session");
   }
 
-  async createSession(opts?: { title?: string }): Promise<Session> {
+  async createSession(opts?: { title?: string; agent?: string }): Promise<Session> {
     return this.request("POST", "/session", opts ?? {});
   }
+
 
   async sendPrompt(sessionId: string, input: PromptInput): Promise<{ info: unknown; parts: Part[] }> {
     return this.request("POST", `/session/${sessionId}/message`, input);
@@ -174,6 +175,18 @@ export class OpenCodeClient {
 
   async sessionStatuses(): Promise<Record<string, { type: "idle" | "busy" | "retry"; [k: string]: unknown }>> {
     return this.request("GET", "/session/status", undefined, 15_000);
+  }
+
+  async switchAgent(sessionId: string, agent: string): Promise<void> {
+    await this.request("POST", `/api/session/${sessionId}/agent`, { agent }, 15_000);
+  }
+
+  async getSession(sessionId: string): Promise<Session> {
+    return this.request("GET", `/session/${sessionId}`);
+  }
+
+  async forkSession(sessionId: string, messageID?: string): Promise<Session> {
+    return this.request("POST", `/session/${sessionId}/fork`, messageID ? { messageID } : {});
   }
 
   async setAuth(providerId: string, key: string): Promise<boolean> {

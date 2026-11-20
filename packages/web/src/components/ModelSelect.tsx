@@ -17,20 +17,24 @@ export default function ModelSelect({ providers, value, onChange, allowEmpty = f
 
   return (
     <select
+      aria-label="Modelo"
       className={className ?? "select"}
       value={current}
       onChange={(e) => onChange(parseModelKey(e.target.value))}
     >
-      {allowEmpty ? <option value="">decidir depois</option> : null}
+      {allowEmpty ? <option value="">Decidir depois</option> : null}
       {!known && current ? <option value={current}>{current}</option> : null}
       {usable.map((p) => (
         <optgroup key={p.id} label={p.name}>
-          {p.models.map((m) => (
-            <option key={m.id} value={`${p.id}/${m.id}`}>
-              {m.name}
-              {m.free ? " · grátis" : ""}
-            </option>
-          ))}
+          {p.models.map((m) => {
+            const fast = /flash|lightning|tidepool|mini|small/i.test(`${m.id} ${m.name}`);
+            return (
+              <option key={m.id} value={`${p.id}/${m.id}`}>
+                {m.name}
+                {fast ? " · rápido" : ""}
+              </option>
+            );
+          })}
         </optgroup>
       ))}
     </select>

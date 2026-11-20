@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Hefesto">
+  <rect width="256" height="256" rx="56" fill="#070b13"/>
+  <rect x="8" y="8" width="240" height="240" rx="50" fill="none" stroke="#f5a524" stroke-opacity=".35" stroke-width="2"/>
+  <path d="M78 70v116M178 70v116M78 128h100" fill="none" stroke="#f5a524" stroke-width="24" stroke-linecap="round"/>
+</svg>

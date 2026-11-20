@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import {
   api,
   type ConnectorView,
+  type HefestoStatus,
   type Instance,
   type ModelRef,
   type OpencodeMessage,
@@ -10,10 +11,18 @@ import {
   type ProviderInfo,
 } from "../api";
 import Avatar from "../components/Avatar";
-import { connectorNeedsAttention } from "../components/ConnectorStatusBadge";
+import AgentSwitcher from "../components/AgentSwitcher";
+import EngineNotice from "../components/EngineNotice";
 import Markdown from "../components/Markdown";
 import ModelSelect from "../components/ModelSelect";
 import TopBar from "../components/TopBar";
+import { setLastInstanceId } from "../storage";
+
+const SUGGESTIONS = [
+  "O que você consegue fazer?",
+  "Me ajude a organizar uma tarefa",
+  "Explique este código para mim",
+];
 
 type Block =
   | { id: string; kind: "text"; text: string }
@@ -65,6 +74,16 @@ function toolOwner(tool: string, connectors: ConnectorView[]): string | undefine
   return match?.alias;
 }
 
+function friendlyError(message: string): string {
+  if (/insufficient balance|saldo insuficiente|payment required/i.test(message)) {
+    return "A conta de IA está sem saldo. Recarregue ou escolha outro modelo em Ajustes.";
+  }
+  if (/provider model not found|model not found/i.test(message)) {
+    return "Esse modelo não está mais disponível. Escolha outro modelo em Ajustes.";
+  }
+  return message;
+}
+
 export default function Chat() {
   const { id = "" } = useParams();
   const [instance, setInstance] = useState<Instance | null>(null);
@@ -77,15 +96,21 @@ export default function Chat() {
   const [stopping, setStopping] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
+  const [engineStatus, setEngineStatus] = useState<HefestoStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   const sessionRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+
+  useEffect(() => {
+    if (instance) setLastInstanceId(instance.id);
+  }, [instance]);
 
   useEffect(() => {
     let alive = true;
@@ -119,18 +144,26 @@ export default function Chat() {
     }
 
     (async () => {
-      const [{ instance }, prov, st, conn] = await Promise.all([
+      const [instanceRes, provRes, statusRes, connRes] = await Promise.allSettled([
         api.instance(id),
         api.instanceProviders(id),
         api.status(),
         api.instanceConnectors(id),
       ]);
       if (!alive) return;
+      if (statusRes.status === "fulfilled") setEngineStatus(statusRes.value);
+      if (instanceRes.status === "rejected") throw instanceRes.reason;
+      if (provRes.status === "rejected") throw provRes.reason;
+      if (connRes.status === "rejected") throw connRes.reason;
+      const { instance } = instanceRes.value;
+      const prov = provRes.value;
+      const st = statusRes.status === "fulfilled" ? statusRes.value : undefined;
+      const conn = connRes.value;
       setInstance(instance);
       setProviders(prov.providers);
       setConnectors(conn.connectors);
       setModel(instance.model);
-      setDefaultModel(st.defaultModel);
+      setDefaultModel(st?.defaultModel);
 
       let sessionId = (await api.ensureSession(instance.id)).sessionId;
       if (!alive) return;
@@ -164,7 +197,9 @@ export default function Chat() {
           const block = partToBlock(part);
           if (block) upsertBlock(part.messageID, block);
         } else if (e.type === "session.error") {
-          const message = String(p.error?.data?.message ?? p.error?.message ?? "erro desconhecido");
+          const message = friendlyError(
+            String(p.error?.data?.message ?? p.error?.message ?? "Erro desconhecido"),
+          );
           setError(message.slice(0, 240));
           setBusy(false);
         }
@@ -205,10 +240,9 @@ export default function Chat() {
     try {
       await api.sendPrompt(id, sessionId, [{ type: "text", text }], {
         model: model ?? defaultModel,
-        system: instance?.systemPrompt,
       });
     } catch (e) {
-      const message = (e as Error).message;
+      const message = friendlyError((e as Error).message);
       if (instance && /404|not found/i.test(message)) {
         try {
           await api.resetSession(instance.id);
@@ -216,7 +250,7 @@ export default function Chat() {
           sessionRef.current = fresh;
           setMessages([]);
           setDraft(text);
-          setError("a conversa anterior não existe mais; uma nova foi criada, envie de novo");
+          setError("A conversa anterior não existe mais; uma nova foi criada. Envie de novo.");
         } catch (err) {
           setError((err as Error).message);
         }
@@ -242,7 +276,7 @@ export default function Chat() {
         const { sessionId: fresh } = await api.ensureSession(instance.id);
         sessionRef.current = fresh;
         setMessages([]);
-        setError("a conversa anterior não existe mais; uma nova foi criada");
+        setError("A conversa anterior não existe mais; uma nova foi criada.");
         return;
       }
       if (!sessionId) return;
@@ -292,12 +326,12 @@ export default function Chat() {
         <TopBar
           right={
             <Link to="/" className="btn ghost small">
-              todas as instâncias
+              Todos os agentes
             </Link>
           }
         />
         <main className="narrow">
-          {error ? <div className="banner error">{error}</div> : <p className="muted">abrindo a conversa…</p>}
+          {error ? <div className="banner error">{error}</div> : <p className="muted">Abrindo a conversa…</p>}
         </main>
       </div>
     );
@@ -307,7 +341,7 @@ export default function Chat() {
     <div className="page chat-page" style={{ "--accent": instance.accent } as CSSProperties}>
       <header className="topbar chat-topbar">
         <Link
-          to={`/i/${instance.id}`}
+          to={`/i/${instance.id}/painel`}
           className="brand chat-brand"
           title="Voltar ao painel"
           aria-label={`Voltar ao painel de ${instance.name}`}
@@ -317,35 +351,60 @@ export default function Chat() {
           <span>{instance.name}</span>
         </Link>
         <div className="chat-tools">
-          {connectors
-            .filter(
-              (connector) =>
-                connector.enabled &&
-                connector.status === "connected" &&
-                !connectorNeedsAttention(connector),
-            )
-            .map((connector) => (
-              <span className="chip" key={connector.alias}>
-                {connector.name}
-              </span>
-            ))}
-          <Link to={`/i/${instance.id}/conectores`} className="btn small ghost">
-            conectores
+          <AgentSwitcher currentId={instance.id} />
+          <Link to={`/i/${instance.id}/conectores`} className="btn small primary">
+            Ferramentas
           </Link>
           <ModelSelect providers={providers} value={model} onChange={(m) => void changeModel(m)} allowEmpty />
+          <Link to={`/i/${instance.id}/config`} className="btn small ghost">
+            Ajustes
+          </Link>
           <button type="button" className="btn small ghost" onClick={() => void resetConversation()}>
-            <span className="chat-new-full">nova conversa</span>
-            <span className="chat-new-short">nova</span>
+            <span className="chat-new-full">Nova conversa</span>
+            <span className="chat-new-short">Nova</span>
           </button>
         </div>
       </header>
 
+      <EngineNotice status={engineStatus} />
+
       <div className="messages">
-        {loading ? <p className="muted center">carregando histórico…</p> : null}
+        {loading ? <p className="muted center">Carregando histórico…</p> : null}
+        {!loading && !model && !defaultModel ? (
+          <div className="banner info chat-model-cta">
+            Nenhum modelo escolhido.{" "}
+            <Link to={`/i/${instance.id}/config`} className="link">
+              Escolha um modelo em Ajustes
+            </Link>{" "}
+            para conversar.
+          </div>
+        ) : null}
         {!loading && messages.length === 0 ? (
           <div className="empty chat-empty">
             <p>
-              Converse com <strong>{instance.name}</strong>. O prompt da instância já está ativo.
+              Converse com <strong>{instance.name}</strong>. Estou pronto para ajudar.
+            </p>
+            <div className="chat-suggestions">
+              {SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="btn small ghost"
+                  onClick={() => {
+                    setDraft(suggestion);
+                    composerRef.current?.focus();
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+            <p className="hint">
+              Personalize nome, personalidade e ferramentas em{" "}
+              <Link to={`/i/${instance.id}/config`} className="link">
+                Ajustes
+              </Link>
+              .
             </p>
           </div>
         ) : null}
@@ -372,16 +431,26 @@ export default function Chat() {
             ) : null}
           </div>
         ))}
-        {busy ? <div className="working">● trabalhando…</div> : null}
+        {busy ? (
+          <div className="working" role="status" aria-live="polite">
+            ● Trabalhando…
+          </div>
+        ) : null}
         <div ref={endRef} />
       </div>
 
-      {error ? <div className="banner error chat-error">{error}</div> : null}
+      {error ? (
+        <div className="banner error chat-error" role="alert">
+          {error}
+        </div>
+      ) : null}
 
       <div className="composer">
         <textarea
+          ref={composerRef}
           value={draft}
           rows={2}
+          aria-label={`Mensagem para ${instance.name}`}
           placeholder={`mensagem para ${instance.name}…`}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -402,7 +471,7 @@ export default function Chat() {
             disabled={stopping}
             title="interromper a tarefa atual (Esc)"
           >
-            {stopping ? "parando…" : "■ parar"}
+            {stopping ? "Parando…" : "■ Parar"}
           </button>
         ) : null}
         <button className="btn primary" onClick={() => void send()} disabled={busy || !draft.trim()}>

@@ -63,7 +63,7 @@ export default function AvatarUpload({ name, accent, value, onChange }: Props) {
             </button>
           ) : null}
         </div>
-        <span className="hint">quadrada, recortada em 256px</span>
+        <span className="hint">Quadrada, recortada em 256px</span>
         {error ? <span className="error-text">{error}</span> : null}
       </div>
       <input

@@ -1,62 +1,100 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, modelLabel, type HefestoStatus, type Instance, type ProviderMeta } from "../api";
+import {
+  api,
+  modelLabel,
+  type HefestoStatus,
+  type Instance,
+  type ProviderMeta,
+  type UpdateInfo,
+} from "../api";
 import AsciiArt from "../components/AsciiArt";
 import Avatar from "../components/Avatar";
+import EngineNotice from "../components/EngineNotice";
 import TopBar from "../components/TopBar";
+import { getLastInstanceId } from "../storage";
 
 export default function Landing() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [providers, setProviders] = useState<ProviderMeta[]>([]);
   const [connectorCount, setConnectorCount] = useState(0);
   const [status, setStatus] = useState<HefestoStatus | null>(null);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let alive = true;
-    Promise.all([api.status(), api.instances(), api.providerMeta(), api.connectorCatalog()])
-      .then(([st, list, prov, connectors]) => {
-        if (!alive) return;
-        setStatus(st);
-        setInstances(list.instances);
-        setProviders(prov.providers);
-        setConnectorCount(connectors.connectors.length);
+    api
+      .status()
+      .then((st) => {
+        if (alive) setStatus(st);
       })
       .catch((e: Error) => {
         if (alive) setError(e.message);
       });
+    api
+      .instances()
+      .then((res) => {
+        if (alive) setInstances(res.instances);
+      })
+      .catch(() => undefined);
+    api
+      .providerMeta()
+      .then((res) => {
+        if (alive) setProviders(res.providers);
+      })
+      .catch(() => undefined);
+    api
+      .connectorCatalog()
+      .then((res) => {
+        if (alive) setConnectorCount(res.connectors.length);
+      })
+      .catch(() => undefined);
+    api
+      .update()
+      .then((info) => {
+        if (alive) setUpdate(info);
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
   }, []);
 
+  const lastId = getLastInstanceId();
+  const last =
+    instances.find((item) => item.id === lastId) ??
+    [...instances].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+
   return (
     <div className="page">
-      <TopBar
-        right={
-          <span className="engine-chip">
-            <span className={status?.running ? "dot online" : "dot"} />
-            {status ? `opencode ${status.version ?? "?"}` : "conectando ao motor…"}
-          </span>
-        }
-      />
+      <TopBar />
 
       <main className="landing">
+        <EngineNotice status={status} />
+
         <section className="hero">
           <AsciiArt />
           <p className="hero-lead">
-            A forja de agentes do <strong>opencode</strong>. Escolha um modelo, conecte seu provedor e crie
-            instâncias com nome, foto e personalidade próprios — cada uma com seu agente e sua conversa.
+            Sua IA, forjada do seu jeito. Dê nome, voz e ferramentas a um agente e converse como quiser.
           </p>
           <div className="hero-actions">
-            <Link to="/comecar" className="btn primary">
-              Começar agora
-            </Link>
-            <a href="#como-funciona" className="btn ghost">
-              Como funciona
-            </a>
+            {last ? (
+              <>
+                <Link to={`/i/${last.id}/chat`} className="btn primary">
+                  Continuar conversa
+                </Link>
+                <Link to="/comecar" className="btn ghost">
+                  Novo agente
+                </Link>
+              </>
+            ) : (
+              <Link to="/comecar" className="btn primary">
+                Começar agora
+              </Link>
+            )}
           </div>
-          {error ? <div className="banner error">Motor indisponível: {error}</div> : null}
+          {error ? <div className="banner error">Não consegui conectar ao assistente: {error}</div> : null}
         </section>
 
         <section id="como-funciona" className="features">
@@ -64,26 +102,29 @@ export default function Landing() {
           <div className="features-grid">
             <article className="feature">
               <span className="feature-num">01</span>
-              <h3>Escolha o modelo</h3>
-              <p>Use os modelos que o opencode já conhece ou conecte um provedor com sua API key.</p>
+              <h3>Converse de verdade</h3>
+              <p>Chat com histórico, respostas em tempo real e botão para parar quando quiser.</p>
             </article>
             <article className="feature">
               <span className="feature-num">02</span>
-              <h3>Forje uma instância</h3>
-              <p>Defina foto, nome, tom de voz e instruções. O Hefesto monta o prompt do agente.</p>
+              <h3>Escolha como ele pensa</h3>
+              <p>
+                Comece com os modelos disponíveis do opencode ou adicione OpenAI, Anthropic, DeepSeek e outros
+                provedores.
+              </p>
             </article>
             <article className="feature">
               <span className="feature-num">03</span>
-              <h3>Converse e delegue</h3>
-              <p>Cada instância tem chat, seleção de modelo e ferramentas do opencode no mesmo lugar.</p>
+              <h3>Dê personalidade</h3>
+              <p>Nome, foto, tom de voz e instruções próprias. Cada agente tem a sua conversa.</p>
             </article>
             <article className="feature">
               <span className="feature-num">04</span>
               <h3>Conecte ferramentas</h3>
               <p>
                 {connectorCount > 0
-                  ? `${connectorCount} conector${connectorCount === 1 ? "" : "es"} MCP no catálogo, registrados por instância.`
-                  : "Registre servidores MCP por instância, sem compartilhar conexões."}
+                  ? `${connectorCount} ferramenta${connectorCount === 1 ? "" : "s"} MCP no catálogo, prontas para cada agente.`
+                  : "Conecte ferramentas MCP como Discord e servidores próprios quando precisar."}
               </p>
             </article>
           </div>
@@ -91,35 +132,73 @@ export default function Landing() {
 
         <section className="instances">
           <div className="section-head">
-            <h2 className="section-title">Suas instâncias</h2>
+            <h2 className="section-title">Seus agentes</h2>
             <Link to="/comecar" className="btn small">
-              + Nova instância
+              + Novo agente
             </Link>
           </div>
 
           {instances.length === 0 ? (
             <div className="empty">
-              <p>Nenhuma instância ainda. A forja está vazia.</p>
+              <p>A forja está vazia. Crie seu primeiro agente para começar.</p>
               <Link to="/comecar" className="btn primary small">
-                Forjar a primeira
+                Criar o primeiro agente
               </Link>
             </div>
           ) : (
-            <div className="instances-grid">
-              {instances.map((instance) => (
-                <Link key={instance.id} to={`/i/${instance.id}`} className="instance-card">
-                  <Avatar source={instance} size={48} />
-                  <div className="instance-card-body">
-                    <strong>{instance.name}</strong>
-                    <span className="muted">{instance.tagline || "sem descrição"}</span>
-                    <span className="instance-model">{modelLabel(providers, instance.model)}</span>
+            <>
+              {last ? (
+                <Link to={`/i/${last.id}/chat`} className="continue-card">
+                  <Avatar source={last} size={56} />
+                  <div className="continue-card-body">
+                    <span className="muted small">Continuar conversa</span>
+                    <strong>{last.name}</strong>
+                    <span className="muted">{last.tagline || "Sem descrição"}</span>
+                    <span className="instance-model">{modelLabel(providers, last.model)}</span>
                   </div>
-                  <span className="instance-arrow">→</span>
+                  <span className="btn primary small">Abrir conversa →</span>
                 </Link>
-              ))}
-            </div>
+              ) : null}
+              <div className="instances-grid">
+                {instances
+                  .filter((instance) => instance.id !== last?.id)
+                  .map((instance) => (
+                    <Link
+                      key={instance.id}
+                      to={`/i/${instance.id}/chat`}
+                      className="instance-card"
+                    >
+                      <Avatar source={instance} size={48} />
+                      <div className="instance-card-body">
+                        <strong>{instance.name}</strong>
+                        <span className="muted">{instance.tagline || "Sem descrição"}</span>
+                        <span className="instance-model">
+                          {modelLabel(providers, instance.model)}
+                        </span>
+                      </div>
+                      <span className="instance-arrow">→</span>
+                    </Link>
+                  ))}
+              </div>
+            </>
           )}
         </section>
+
+        <footer className="landing-footer">
+          <span>Hefesto {status?.appVersion ? `v${status.appVersion}` : ""}</span>
+          {update?.available ? (
+            <a
+              className="link"
+              href={update.url ?? "https://github.com/SaladaDeFlutter/Hefesto/releases/latest"}
+              target="_blank"
+              rel="noreferrer"
+            >
+              v{update.latest} disponível — veja como atualizar
+            </a>
+          ) : (
+            <span className="muted small">Feito por Flutter</span>
+          )}
+        </footer>
       </main>
     </div>
   );

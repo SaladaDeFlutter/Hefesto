@@ -24,6 +24,7 @@ export interface CatalogModel {
   id: string;
   name: string;
   free: boolean;
+  available: boolean;
 }
 
 export interface CatalogProvider {
@@ -42,8 +43,19 @@ export interface HefestoStatus {
   port: number;
   baseUrl: string;
   version?: string;
+  appVersion?: string;
+  opencode?: { ok: boolean; version?: string; error?: string };
   defaultModel?: ModelRef;
   connectors: string[];
+}
+
+export interface UpdateInfo {
+  checkedAt: string;
+  current: string;
+  latest?: string;
+  url?: string;
+  available: boolean;
+  error?: string;
 }
 
 export interface ConnectorTool {
@@ -208,6 +220,8 @@ export function discordInviteUrl(appId: unknown): string | undefined {
 export const api = {
   status: (): Promise<HefestoStatus> => http<HefestoStatus>("/api/status", "GET"),
 
+  update: (): Promise<UpdateInfo> => http<UpdateInfo>("/api/update", "GET"),
+
   providerCatalog: (): Promise<{ providers: CatalogProvider[] }> => http("/api/provider-catalog", "GET"),
 
   providerMeta: (): Promise<{ providers: ProviderMeta[] }> => http("/api/provider-catalog?meta=1", "GET"),
@@ -270,8 +284,11 @@ export const api = {
   updateInstance: (id: string, input: InstanceUpdate): Promise<{ instance: Instance }> =>
     http(`/api/instances/${encodeURIComponent(id)}`, "PATCH", input),
 
-  deleteInstance: (id: string): Promise<void> =>
-    http(`/api/instances/${encodeURIComponent(id)}`, "DELETE"),
+  deleteInstance: (id: string, opts?: { keepHistory?: boolean }): Promise<void> =>
+    http(
+      `/api/instances/${encodeURIComponent(id)}${opts?.keepHistory ? "?keepHistory=1" : ""}`,
+      "DELETE",
+    ),
 
   ensureSession: (id: string): Promise<{ sessionId: string }> =>
     http(`/api/instances/${encodeURIComponent(id)}/session`, "POST", {}),
@@ -292,12 +309,12 @@ export const api = {
     instanceId: string,
     sessionId: string,
     parts: Array<{ type: "text"; text: string }>,
-    opts: { model?: ModelRef; system?: string },
+    opts: { model?: ModelRef },
   ): Promise<void> =>
-    http(`/oc/i/${encodeURIComponent(instanceId)}/session/${sessionId}/prompt_async`, "POST", {
+    http(`/oc/i/${encodeURIComponent(instanceId)}/session/${encodeURIComponent(sessionId)}/prompt_async`, "POST", {
       parts,
+      agent: "hefesto",
       ...(opts.model ? { model: opts.model } : {}),
-      ...(opts.system ? { system: opts.system } : {}),
     }),
 
   subscribe: (instanceId: string, onEvent: (e: { type: string; properties?: any }) => void): (() => void) => {
@@ -328,7 +345,7 @@ export function modelLabel(
   providers: Array<{ id: string; name: string; models?: Array<{ id: string; name: string }> }>,
   model?: ModelRef,
 ): string {
-  if (!model) return "sem modelo";
+  if (!model) return "Sem modelo";
   const provider = providers.find((p) => p.id === model.providerID);
   const info = provider?.models?.find((m) => m.id === model.modelID);
   return `${provider?.name ?? model.providerID}/${info?.name ?? model.modelID}`;

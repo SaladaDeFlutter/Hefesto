@@ -6,7 +6,8 @@
 ## Publicar/atualizar
 
 1. Gere o release `vX.Y.Z` (o workflow `.github/workflows/windows-release.yml` faz isso no push da tag).
-2. Atualize `PackageVersion`, as URLs e os `InstallerSha256` neste arquivo (use os hashes do release).
+2. Baixe o asset `SaladaDeFlutter.Hefesto.yaml` da release. O CI já gera esse arquivo com `PackageVersion`, URLs e
+   `InstallerSha256` corretos a partir dos checksums; não é preciso editar à mão.
 3. Valide e envie (precisa do [wingetcreate](https://github.com/microsoft/winget-create)):
 
 ```cmd

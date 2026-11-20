@@ -36,8 +36,10 @@ export interface InstancePatch extends Partial<InstanceInput> {
   clearModel?: boolean;
 }
 
+const STORE_VERSION = 1;
+
 interface StoreFile {
-  version: 1;
+  version: number;
   instances: Instance[];
 }
 
@@ -108,7 +110,7 @@ function buildSystemPrompt(i: {
   instructions?: string;
 }): string {
   const lines = [
-    `Você é ${i.name}, uma instância do Hefesto — um ambiente local de agentes de código baseado no opencode.`,
+    `Você é ${i.name}, um agente do Hefesto — um ambiente local de agentes de código baseado no opencode.`,
   ];
   if (i.tagline) lines.push(`Resumo: ${i.tagline}.`);
   if (i.personality) lines.push(`Personalidade e tom: ${i.personality}.`);
@@ -156,7 +158,11 @@ export class InstanceStore {
     try {
       const raw = await readFile(file, "utf8");
       const parsed = JSON.parse(raw) as Partial<StoreFile>;
-      return Array.isArray(parsed.instances) ? parsed.instances : undefined;
+      if (!Array.isArray(parsed.instances)) return undefined;
+      if (parsed.version !== undefined && parsed.version !== STORE_VERSION) {
+        console.warn(`[hefesto] ${file} versão ${parsed.version}; lendo como ${STORE_VERSION}`);
+      }
+      return parsed.instances;
     } catch {
       return undefined;
     }
@@ -247,7 +253,7 @@ export class InstanceStore {
   }
 
   private async persist(): Promise<void> {
-    const payload = JSON.stringify({ version: 1, instances: this.items }, null, 2);
+    const payload = JSON.stringify({ version: STORE_VERSION, instances: this.items }, null, 2);
     this.saveQueue = this.saveQueue.then(async () => {
       await mkdir(this.dir, { recursive: true });
       try {

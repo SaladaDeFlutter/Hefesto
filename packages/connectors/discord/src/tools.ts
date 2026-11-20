@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { PermissionFlagsBits } from "discord.js";
 import { z } from "zod";
 import {
   addReaction,
@@ -23,6 +24,7 @@ import {
   listTree,
   readMessages,
   readThread,
+  requirePermissions,
   removeRole,
   removeTimeout,
   sendMessage,
@@ -135,6 +137,7 @@ export function registerTools(server: McpServer) {
     async ({ guild }) =>
       run(async () => {
         const resolved = await getGuild(guild);
+        await requirePermissions(resolved, [PermissionFlagsBits.ViewChannel], "listar canais");
         return { ...serverSummary(resolved), ...listTree(resolved) };
       }),
   );

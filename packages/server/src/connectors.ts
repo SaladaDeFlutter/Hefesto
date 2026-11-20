@@ -75,7 +75,7 @@ function parseEnvironment(value: unknown): Record<string, string> | undefined {
   const raw = requireRecord(value, "environment");
   const out: Record<string, string> = {};
   for (const [key, rawValue] of Object.entries(raw).slice(0, 40)) {
-    if (!ENV_NAME.test(key)) throw new ConnectorError(`variável de ambiente inválida: ${key}`);
+    if (!ENV_NAME.test(key)) throw new ConnectorError(`Variável de ambiente inválida: ${key}`);
     if (typeof rawValue === "string" || typeof rawValue === "number" || typeof rawValue === "boolean") {
       out[key] = String(rawValue).slice(0, 2000);
     }
@@ -90,10 +90,10 @@ function parseTransport(value: unknown): McpConfig | undefined {
   const timeout = typeof raw.timeout === "number" && raw.timeout > 0 ? Math.min(raw.timeout, 3_600_000) : 30_000;
   if (raw.type === "local") {
     if (!Array.isArray(raw.command) || raw.command.length === 0) {
-      throw new ConnectorError("transport local precisa de command");
+      throw new ConnectorError("O transporte local precisa de um comando.");
     }
     const command = raw.command.map((part) => {
-      if (typeof part !== "string" || !part.trim()) throw new ConnectorError("command inválido");
+      if (typeof part !== "string" || !part.trim()) throw new ConnectorError("Comando inválido.");
       return part.slice(0, 2000);
     });
     const cwd = text(raw.cwd, "cwd", 2000);
@@ -102,10 +102,10 @@ function parseTransport(value: unknown): McpConfig | undefined {
   }
   if (raw.type === "remote") {
     const url = text(raw.url, "url", 2000);
-    if (!url || !/^https?:\/\//.test(url)) throw new ConnectorError("url remota inválida");
+    if (!url || !/^https?:\/\//.test(url)) throw new ConnectorError("URL remota inválida.");
     return { type: "remote", url, enabled, timeout };
   }
-  throw new ConnectorError("transport deve ser local ou remote");
+  throw new ConnectorError("O transporte deve ser local ou remoto.");
 }
 
 function parseConfig(
@@ -164,13 +164,13 @@ export function parseConnectorInput(
   const raw = requireRecord(body, "conector");
   const alias = text(raw.alias ?? aliasHint ?? previous?.alias, "alias", 64);
   if (!alias || !ALIAS.test(alias)) {
-    throw new ConnectorError("alias deve conter letras, números, - ou _ (máx. 64)");
+    throw new ConnectorError("O alias deve conter letras, números, - ou _ (máx. 64).");
   }
   const definitionId = text(raw.definitionId, "definitionId", 120) ?? previous?.definitionId;
   const definition = definitionId ? findConnectorDefinition(definitionId) : undefined;
-  if (definitionId && !definition) throw new ConnectorError(`conector desconhecido: ${definitionId}`);
+  if (definitionId && !definition) throw new ConnectorError(`Conector desconhecido: ${definitionId}`);
   const transport = parseTransport(raw.transport) ?? previous?.transport;
-  if (!definitionId && !transport) throw new ConnectorError("informe definitionId ou transport");
+  if (!definitionId && !transport) throw new ConnectorError("Informe definitionId ou transport.");
 
   const tools: ConnectorTool[] | undefined = Array.isArray(raw.tools)
     ? raw.tools.slice(0, 100).flatMap((item) => {
@@ -195,12 +195,12 @@ export function parseConnectorInput(
 
 export function parseConnectorList(value: unknown): InstanceConnector[] | undefined {
   if (value === undefined || value === null) return undefined;
-  if (!Array.isArray(value)) throw new ConnectorError("connectors deve ser uma lista");
+  if (!Array.isArray(value)) throw new ConnectorError("Conectores devem ser uma lista.");
   const parsed = value.slice(0, 20).map((item) => parseConnectorInput(item));
   const seen = new Set<string>();
   for (const connector of parsed) {
     if (seen.has(connector.alias.toLowerCase())) {
-      throw new ConnectorError(`alias duplicado: ${connector.alias}`);
+      throw new ConnectorError(`Alias duplicado: ${connector.alias}`);
     }
     seen.add(connector.alias.toLowerCase());
   }
@@ -208,7 +208,7 @@ export function parseConnectorList(value: unknown): InstanceConnector[] | undefi
 }
 
 export function parseDefaultConnectorIds(value: unknown): string[] {
-  if (!Array.isArray(value)) throw new ConnectorError("defaultConnectors deve ser uma lista");
+  if (!Array.isArray(value)) throw new ConnectorError("Os conectores padrão devem ser uma lista.");
   const ids = value.slice(0, 20).flatMap((item) => {
     if (typeof item !== "string") return [];
     const id = item.trim();
@@ -289,6 +289,12 @@ export function connectorLaunches(
 ): ConnectorLaunch[] {
   return resolveConnectors(connectors, defaultIds).flatMap((connector) => {
     const definition = connector.definitionId ? findConnectorDefinition(connector.definitionId) : undefined;
+    const missingRequired = definition?.fields.some((field) => {
+      if (!field.required) return false;
+      const value = connector.config?.[field.key];
+      return value === undefined || value === null || value === "";
+    });
+    if (missingRequired) return [];
     const base = definition ? definition.transport(root) : connector.transport;
     if (!base) return [];
     const environment = {

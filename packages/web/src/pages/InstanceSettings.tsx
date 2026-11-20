@@ -19,6 +19,7 @@ export default function InstanceSettings() {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [keepHistory, setKeepHistory] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [catalog, setCatalog] = useState<CatalogProvider[]>([]);
   const [providerID, setProviderID] = useState("");
@@ -52,11 +53,11 @@ export default function InstanceSettings() {
   async function connectProvider() {
     const provider = catalog.find((p) => p.id === providerID.trim());
     if (!provider) {
-      setError("provedor não encontrado no catálogo");
+      setError("Provedor não encontrado no catálogo.");
       return;
     }
     if (!providerKey.trim()) {
-      setError("cole a API key do provedor");
+      setError("Cole a chave de acesso do provedor.");
       return;
     }
     setProviderBusy(true);
@@ -66,7 +67,7 @@ export default function InstanceSettings() {
       const res = await api.connectInstanceProvider(id, provider.id, providerKey.trim());
       setProviders(res.providers);
       setInstance((current) => (current ? { ...current, ...res.instance } : current));
-      setNotice(`${provider.name} conectado nesta instância`);
+      setNotice(`${provider.name} conectado neste agente`);
       setProviderID("");
       setProviderKey("");
     } catch (e) {
@@ -79,7 +80,7 @@ export default function InstanceSettings() {
   async function save() {
     if (!instance) return;
     if (!name.trim()) {
-      setError("o nome não pode ficar vazio");
+      setError("O nome não pode ficar vazio.");
       return;
     }
     setSaving(true);
@@ -95,7 +96,7 @@ export default function InstanceSettings() {
         avatar: avatar ?? "",
       });
       setInstance(res.instance);
-      setNotice("alterações salvas");
+      setNotice("Alterações salvas");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -105,11 +106,14 @@ export default function InstanceSettings() {
 
   async function remove() {
     if (!instance) return;
-    if (!window.confirm(`Excluir "${instance.name}"? Essa ação não pode ser desfeita.`)) return;
+    const detail = keepHistory
+      ? "O histórico da conversa será mantido."
+      : "O histórico da conversa também será apagado.";
+    if (!window.confirm(`Excluir "${instance.name}"? ${detail}`)) return;
     setBusy(true);
     setError("");
     try {
-      await api.deleteInstance(instance.id);
+      await api.deleteInstance(instance.id, { keepHistory });
       navigate("/");
     } catch (e) {
       setError((e as Error).message);
@@ -123,12 +127,12 @@ export default function InstanceSettings() {
         <TopBar
           right={
             <Link to="/" className="btn ghost small">
-              todas as instâncias
+              Todos os agentes
             </Link>
           }
         />
         <main className="narrow">
-          {error ? <div className="banner error">{error}</div> : <p className="muted">carregando…</p>}
+          {error ? <div className="banner error">{error}</div> : <p className="muted">Carregando…</p>}
         </main>
       </div>
     );
@@ -139,9 +143,10 @@ export default function InstanceSettings() {
       <TopBar right={<InstanceNav instanceId={instance.id} active="ajustes" />} />
 
       <main className="narrow">
-        <h1>Configurações</h1>
+        <h1>Ajustes</h1>
         <p className="muted">
-          Ajuste a identidade de <strong>{instance.name}</strong>. O prompt do agente é regerado ao salvar.
+          Ajuste como <strong>{instance.name}</strong> aparece e conversa. As mudanças valem para as próximas
+          mensagens.
         </p>
 
         {error ? <div className="banner error">{error}</div> : null}
@@ -167,7 +172,7 @@ export default function InstanceSettings() {
           </div>
 
           <div className="field">
-            <label htmlFor="personality">Personalidade e tom</label>
+            <label htmlFor="personality">Como ele fala</label>
             <textarea
               id="personality"
               value={personality}
@@ -178,7 +183,7 @@ export default function InstanceSettings() {
           </div>
 
           <div className="field">
-            <label htmlFor="instructions">Instruções permanentes</label>
+            <label htmlFor="instructions">O que ele deve saber</label>
             <textarea
               id="instructions"
               value={instructions}
@@ -195,16 +200,14 @@ export default function InstanceSettings() {
 
           <div className="actions">
             <button type="submit" className="btn primary" disabled={saving || busy}>
-              {saving ? "salvando…" : "Salvar alterações"}
+              {saving ? "Salvando…" : "Salvar alterações"}
             </button>
           </div>
         </form>
 
         <section className="panel provider-list">
-          <h2>Provedores</h2>
-          <p className="muted">
-            Cada instância roda um opencode isolado: a chave fica apenas aqui, nunca no Hefesto.
-          </p>
+          <h2>Contas de IA</h2>
+          <p className="muted">A chave fica salva apenas neste agente, nunca no Hefesto.</p>
           {providers.map((provider) => (
             <div key={provider.id} className="provider-row">
               <div className="provider-main">
@@ -213,7 +216,7 @@ export default function InstanceSettings() {
                   <span className="muted small"> · {provider.models.length} modelos</span>
                 </div>
                 <span className={provider.credentialed || provider.public ? "badge ok" : "badge"}>
-                  {provider.credentialed ? "conectado" : provider.public ? "grátis" : "disponível"}
+                  {provider.credentialed ? "Conectado" : provider.public ? "Incluído" : "Disponível"}
                 </span>
               </div>
             </div>
@@ -245,17 +248,27 @@ export default function InstanceSettings() {
               }}
             />
             <button type="button" className="btn small" onClick={() => void connectProvider()} disabled={providerBusy}>
-              {providerBusy ? "conectando…" : "Conectar"}
+              {providerBusy ? "Conectando…" : "Conectar"}
             </button>
           </div>
-          <span className="hint">Depois de conectar, escolha o modelo no painel da instância.</span>
+          <span className="hint">Depois de conectar, escolha o modelo no chat ou no painel do agente.</span>
         </section>
 
         <section className="danger-zone">
           <h2>Zona de perigo</h2>
-          <p className="muted">Excluir apaga a instância e o prompt salvo. A conversa no opencode não é apagada.</p>
+          <p className="muted">
+            Excluir apaga o agente. Por padrão, o histórico da conversa também é apagado.
+          </p>
+          <label className="keep-history">
+            <input
+              type="checkbox"
+              checked={keepHistory}
+              onChange={(e) => setKeepHistory(e.target.checked)}
+            />
+            <span>Manter o histórico da conversa</span>
+          </label>
           <button type="button" className="btn danger" onClick={() => void remove()} disabled={busy}>
-            Excluir instância
+            Excluir agente
           </button>
         </section>
       </main>

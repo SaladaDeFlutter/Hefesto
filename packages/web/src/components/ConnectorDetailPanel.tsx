@@ -113,7 +113,12 @@ export default function ConnectorDetailPanel({
   }, [connector.secrets?.join(","), connector.alias]);
 
   const primaryFields = fields.filter(
-    (field) => field.key === "token" || field.key === "appId" || field.required || field.secret,
+    (field) =>
+      field.key === "token" ||
+      field.key === "appId" ||
+      field.key === "bridgeEnabled" ||
+      field.required ||
+      field.secret,
   );
   const advancedFields = fields.filter((field) => !primaryFields.includes(field));
   const filteredTools = tools.filter((tool) => {
@@ -121,6 +126,10 @@ export default function ConnectorDetailPanel({
     if (!query) return true;
     return `${tool.name} ${tool.description ?? ""}`.toLowerCase().includes(query);
   });
+
+  function toggleStep(step: number) {
+    setActiveStep((current) => (current === step ? 0 : step));
+  }
 
   function stepState(number: number, done: boolean): StepState {
     if (done) return "done";
@@ -239,7 +248,7 @@ export default function ConnectorDetailPanel({
               }
               state={stepState(1, botConfigured || activeStep > 1)}
               active={activeStep === 1}
-              onOpen={() => setActiveStep(1)}
+              onOpen={() => toggleStep(1)}
             >
               <p className="flow-copy">
                 Crie uma aplicação no Portal do Desenvolvedor, adicione um bot e copie o token e o
@@ -250,6 +259,10 @@ export default function ConnectorDetailPanel({
                 <li>No menu Bot, clique em Add Bot.</li>
                 <li>Em Token, clique em Reset Token e copie o valor.</li>
                 <li>Em General Information, copie o Application ID.</li>
+                <li>
+                  Em Bot, ative o Message Content Intent em Privileged Gateway Intents. O Hefesto já
+                  tenta usá-lo por padrão.
+                </li>
               </ol>
               <div className="flow-links">
                 <a
@@ -258,7 +271,7 @@ export default function ConnectorDetailPanel({
                   target="_blank"
                   rel="noreferrer noopener"
                 >
-                  abrir portal
+                  Abrir portal
                 </a>
                 <a
                   className="btn ghost small"
@@ -266,12 +279,12 @@ export default function ConnectorDetailPanel({
                   target="_blank"
                   rel="noreferrer noopener"
                 >
-                  tutorial oficial
+                  Tutorial oficial
                 </a>
               </div>
               <div className="flow-actions">
                 <button className="btn" type="button" onClick={() => setActiveStep(credentialsStep)}>
-                  já criei o bot
+                  Já criei o bot
                 </button>
               </div>
             </SetupStep>
@@ -283,7 +296,7 @@ export default function ConnectorDetailPanel({
             summary={botConfigured ? "Credenciais salvas" : "Token do bot e Application ID"}
             state={stepState(credentialsStep, botConfigured)}
             active={activeStep === credentialsStep}
-            onOpen={() => setActiveStep(credentialsStep)}
+            onOpen={() => toggleStep(credentialsStep)}
           >
             {botConfigured && !editingCredentials ? (
               <>
@@ -304,7 +317,7 @@ export default function ConnectorDetailPanel({
                     type="button"
                     onClick={() => setEditingCredentials(true)}
                   >
-                    editar
+                    Editar
                   </button>
                 </div>
                 <div className="flow-actions">
@@ -313,7 +326,7 @@ export default function ConnectorDetailPanel({
                     type="button"
                     onClick={() => setActiveStep(isDiscord ? 3 : 2)}
                   >
-                    {isDiscord ? "continuar para convite" : "continuar para conexão"}
+                    {isDiscord ? "Continuar para convite" : "Continuar para conexão"}
                   </button>
                 </div>
               </>
@@ -330,7 +343,7 @@ export default function ConnectorDetailPanel({
                 )}
                 {!connector.definitionId && connector.transport?.type === "remote" && (
                   <div className="field">
-                    <label htmlFor="detail-url">url</label>
+                    <label htmlFor="detail-url">URL</label>
                     <input
                       id="detail-url"
                       value={url}
@@ -340,7 +353,7 @@ export default function ConnectorDetailPanel({
                 )}
                 {!connector.definitionId && connector.transport?.type === "local" && (
                   <div className="field">
-                    <label htmlFor="detail-command">comando</label>
+                    <label htmlFor="detail-command">Comando</label>
                     <textarea
                       id="detail-command"
                       value={command}
@@ -353,7 +366,7 @@ export default function ConnectorDetailPanel({
                 )}
                 <div className="flow-actions">
                   <button className="btn primary" type="button" disabled={busy} onClick={saveConfig}>
-                    salvar credenciais
+                    Salvar credenciais
                   </button>
                   {botConfigured && (
                     <button
@@ -361,7 +374,7 @@ export default function ConnectorDetailPanel({
                       type="button"
                       onClick={() => setEditingCredentials(false)}
                     >
-                      cancelar
+                      Cancelar
                     </button>
                   )}
                 </div>
@@ -376,7 +389,7 @@ export default function ConnectorDetailPanel({
               summary={inviteOpened ? "Convite aberto" : inviteUrl ? "Convite disponível" : "Precisa do Application ID"}
               state={stepState(3, inviteOpened)}
               active={activeStep === 3}
-              onOpen={() => setActiveStep(3)}
+              onOpen={() => toggleStep(3)}
             >
               <p className="flow-copy">
                 Clique no botão, escolha o servidor e autorize as permissões. O bot só aparece nos
@@ -391,7 +404,7 @@ export default function ConnectorDetailPanel({
                     rel="noreferrer noopener"
                     onClick={() => setInviteOpened(true)}
                   >
-                    convidar bot para o servidor
+                    Convidar bot para o servidor
                   </a>
                   <span className="muted small">Permissão solicitada: Administrador.</span>
                 </div>
@@ -403,11 +416,11 @@ export default function ConnectorDetailPanel({
               <div className="flow-actions">
                 {inviteUrl && (
                   <button className="btn" type="button" onClick={() => setActiveStep(4)}>
-                    já convidei
+                    Já convidei
                   </button>
                 )}
                 <button className="btn ghost" type="button" onClick={() => setActiveStep(2)}>
-                  voltar às credenciais
+                  Voltar às credenciais
                 </button>
               </div>
             </SetupStep>
@@ -415,17 +428,17 @@ export default function ConnectorDetailPanel({
 
           <SetupStep
             number={connectStep}
-            title="Conecte o conector"
+            title="Conecte a ferramenta"
             summary={
               readyConnected
-                ? "Conector conectado"
+                ? "Ferramenta conectada"
                 : connected
                   ? "MCP ativo, credenciais pendentes"
                   : "Último passo"
             }
             state={stepState(connectStep, readyConnected)}
             active={activeStep === connectStep}
-            onOpen={() => setActiveStep(connectStep)}
+            onOpen={() => toggleStep(connectStep)}
           >
             {readyConnected ? (
               <div className="flow-success">
@@ -433,9 +446,9 @@ export default function ConnectorDetailPanel({
                   ✓
                 </span>
                 <div>
-                  <strong>Conector conectado</strong>
+                  <strong>Ferramenta conectada</strong>
                   <p>
-                    As ferramentas já estão disponíveis nas conversas desta instância. O bot também
+                    As ferramentas já estão disponíveis nas conversas deste agente. O bot também
                     pode responder menções e DMs no Discord.
                   </p>
                 </div>
@@ -446,7 +459,7 @@ export default function ConnectorDetailPanel({
               </p>
             ) : (
               <p className="flow-copy">
-                Com as credenciais salvas, conecte o conector à engine desta instância.
+                Com as credenciais salvas, conecte a ferramenta ao opencode deste agente.
               </p>
             )}
             {!botConfigured && !connected && (
@@ -457,7 +470,7 @@ export default function ConnectorDetailPanel({
             <div className="flow-actions">
               {connected ? (
                 <button className="btn" type="button" disabled={busy} onClick={onDisconnect}>
-                  desconectar
+                  Desconectar
                 </button>
               ) : (
                 <button
@@ -466,11 +479,11 @@ export default function ConnectorDetailPanel({
                   disabled={busy || !botConfigured}
                   onClick={onConnect}
                 >
-                  conectar
+                  Conectar
                 </button>
               )}
               <button className="btn ghost" type="button" disabled={busy} onClick={onToggleEnabled}>
-                {connector.enabled ? "desativar" : "ativar"}
+                {connector.enabled ? "Desativar" : "Ativar"}
               </button>
             </div>
           </SetupStep>
@@ -482,7 +495,7 @@ export default function ConnectorDetailPanel({
           <h3>Resumo</h3>
           <dl className="aside-facts">
             <div>
-              <dt>transporte</dt>
+              <dt>Transporte</dt>
               <dd>
                 {connector.transport?.type === "local"
                   ? "stdio"
@@ -492,15 +505,15 @@ export default function ConnectorDetailPanel({
               </dd>
             </div>
             <div>
-              <dt>ferramentas</dt>
+              <dt>Ferramentas</dt>
               <dd>{tools.length}</dd>
             </div>
             <div>
-              <dt>credenciais</dt>
+              <dt>Credenciais</dt>
               <dd>{connector.secrets?.length ? "salvas" : "pendentes"}</dd>
             </div>
             <div>
-              <dt>categoria</dt>
+              <dt>Categoria</dt>
               <dd>{connector.category ?? "personalizado"}</dd>
             </div>
           </dl>
@@ -535,11 +548,11 @@ export default function ConnectorDetailPanel({
 
         <div className="connector-danger-zone aside-danger">
           <div>
-            <strong>Remover conector</strong>
-            <span className="muted small">Remove apenas desta instância.</span>
+            <strong>Remover ferramenta</strong>
+            <span className="muted small">Remove apenas deste agente.</span>
           </div>
           <button className="btn danger small" type="button" disabled={busy} onClick={onRemove}>
-            remover
+            Remover
           </button>
         </div>
       </aside>

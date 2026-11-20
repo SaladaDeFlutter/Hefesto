@@ -39,7 +39,8 @@ SetCompressorDictSize 64
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Instalar o Hefesto"
 !define MUI_WELCOMEPAGE_TEXT "O Hefesto já vem com Node.js e opencode incluídos.$\r$\n$\r$\nA instalação é feita só para o seu usuário, sem administrador.$\r$\n$\r$\nClique em Avançar para continuar."
-!define MUI_FINISHPAGE_RUN "$INSTDIR\hefesto.cmd"
+!define MUI_FINISHPAGE_RUN "$SYSDIR\wscript.exe"
+!define MUI_FINISHPAGE_RUN_PARAMETERS '$\"$INSTDIR\hefesto.vbs$\"'
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir o Hefesto agora"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\LEIA-ME.txt"
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Abrir o LEIA-ME"
@@ -101,9 +102,9 @@ Section "Hefesto" SecMain
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\Hefesto"
-  CreateShortcut "$SMPROGRAMS\Hefesto\Hefesto.lnk" "$INSTDIR\hefesto.cmd" "" "$INSTDIR\hefesto.cmd" 0
+  CreateShortcut "$SMPROGRAMS\Hefesto\Hefesto.lnk" "$SYSDIR\wscript.exe" '"$INSTDIR\hefesto.vbs"' "$INSTDIR\hefesto.cmd" 0
   CreateShortcut "$SMPROGRAMS\Hefesto\Desinstalar Hefesto.lnk" "$INSTDIR\uninstall.exe"
-  CreateShortcut "$DESKTOP\Hefesto.lnk" "$INSTDIR\hefesto.cmd" "" "$INSTDIR\hefesto.cmd" 0
+  CreateShortcut "$DESKTOP\Hefesto.lnk" "$SYSDIR\wscript.exe" '"$INSTDIR\hefesto.vbs"' "$INSTDIR\hefesto.cmd" 0
 
   WriteRegStr HKCU "Software\Hefesto" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Hefesto" "Version" "${APP_VERSION}"

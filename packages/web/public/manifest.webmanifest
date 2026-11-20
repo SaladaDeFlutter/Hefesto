@@ -1,0 +1,17 @@
+{
+  "name": "Hefesto",
+  "short_name": "Hefesto",
+  "description": "A forja de agentes opencode",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070b13",
+  "theme_color": "#070b13",
+  "icons": [
+    {
+      "src": "/hefesto.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

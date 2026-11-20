@@ -29,12 +29,21 @@ interface Entry {
 export class EngineManager {
   private readonly root: string;
   private readonly resolveConnectors: (id: string) => Promise<ConnectorLaunch[]>;
+  private readonly prepare?: (id: string) => Promise<void>;
+  private readonly cwd?: (id: string) => string;
   private readonly entries = new Map<string, Entry>();
   private readonly starting = new Map<string, Promise<Hefesto>>();
 
-  constructor(root: string, resolveConnectors: (id: string) => Promise<ConnectorLaunch[]>) {
+  constructor(
+    root: string,
+    resolveConnectors: (id: string) => Promise<ConnectorLaunch[]>,
+    prepare?: (id: string) => Promise<void>,
+    cwd?: (id: string) => string,
+  ) {
     this.root = root;
     this.resolveConnectors = resolveConnectors;
+    this.prepare = prepare;
+    this.cwd = cwd;
   }
 
   dir(id: string): string {
@@ -62,7 +71,12 @@ export class EngineManager {
     const dir = this.dir(id);
     await mkdir(dir, { recursive: true });
     const connectors = await this.resolveConnectors(id);
-    return Hefesto.start({ connectors, env: isolatedEnv(dir) });
+    await this.prepare?.(id);
+    return Hefesto.start({
+      connectors,
+      env: isolatedEnv(dir),
+      ...(this.cwd ? { cwd: this.cwd(id) } : {}),
+    });
   }
 
   async stop(id: string): Promise<void> {

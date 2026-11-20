@@ -58,7 +58,7 @@ export default function InstanceDashboard() {
         <TopBar
           right={
             <Link to="/" className="btn ghost small">
-              todas as instâncias
+              Todos os agentes
             </Link>
           }
         />
@@ -66,7 +66,7 @@ export default function InstanceDashboard() {
           {error ? (
             <div className="banner error">Instância não encontrada: {error}</div>
           ) : (
-            <p className="muted">abrindo a forja…</p>
+            <p className="muted">Abrindo a forja…</p>
           )}
         </main>
       </div>
@@ -82,11 +82,11 @@ export default function InstanceDashboard() {
           <Avatar source={instance} size={84} />
           <div className="instance-hero-body">
             <h1>{instance.name}</h1>
-            <p className="muted">{instance.tagline || "sem descrição"}</p>
+            <p className="muted">{instance.tagline || "Sem descrição"}</p>
             <div className="hero-chips">
               <span className="chip accent">{modelLabel(providers, instance.model)}</span>
               <span className={instance.sessionId ? "chip" : "chip dim"}>
-                {instance.sessionId ? "conversa iniciada" : "aguardando conversa"}
+                {instance.sessionId ? "Conversa iniciada" : "Aguardando conversa"}
               </span>
             </div>
           </div>
@@ -99,7 +99,7 @@ export default function InstanceDashboard() {
             <span className="dash-icon">›_</span>
             <div>
               <h2>Chat</h2>
-              <p>Converse com {instance.name} usando as ferramentas do opencode.</p>
+              <p>Converse com {instance.name} e use as ferramentas conectadas.</p>
             </div>
             <span className="dash-arrow">→</span>
           </Link>
@@ -108,7 +108,7 @@ export default function InstanceDashboard() {
             <span className="dash-icon">◆</span>
             <div className="dash-card-body">
               <h2>Modelo</h2>
-              <p>Troque o modelo usado nas próximas mensagens{savingModel ? " · salvando…" : ""}.</p>
+              <p>Escolha o modelo que responde nas próximas mensagens{savingModel ? " · salvando…" : ""}.</p>
               <ModelSelect
                 providers={providers}
                 value={instance.model}
@@ -125,22 +125,22 @@ export default function InstanceDashboard() {
                 ? `/i/${instance.id}/conectores/discord?tab=config`
                 : `/i/${instance.id}/conectores`
             }
-            className="dash-card"
+            className="dash-card accent"
           >
             <span className="dash-icon">⌁</span>
             <div>
               <h2>
-                Conectores
+                Ferramentas
                 <span className="badge">
                   {connectors.filter((c) => c.enabled && c.status === "connected" && !connectorNeedsAttention(c)).length}/{connectors.length}
                 </span>
               </h2>
               <p>
                 {needsBot
-                  ? "Configure o token do bot Discord para ativar as ferramentas."
+                  ? "Termine a configuração do Discord para ativar esta ferramenta."
                   : connectors.length === 0
-                    ? "Registre servidores MCP nesta instância."
-                    : `${connectors.length} conector${connectors.length === 1 ? "" : "es"} MCP registrado${connectors.length === 1 ? "" : "s"} nesta engine.`}
+                    ? "Conecte ferramentas MCP para este agente usar."
+                    : `${connectors.length} ferramenta${connectors.length === 1 ? "" : "s"} MCP conectada${connectors.length === 1 ? "" : "s"}.`}
               </p>
             </div>
             <span className="dash-arrow">→</span>
@@ -149,17 +149,13 @@ export default function InstanceDashboard() {
           <Link to={`/i/${instance.id}/config`} className="dash-card">
             <span className="dash-icon">⚙</span>
             <div>
-              <h2>Configurações</h2>
-              <p>Editar identidade, prompt, foto, cor e provedores.</p>
+              <h2>Ajustes</h2>
+              <p>Nome, foto, personalidade e conta de IA.</p>
             </div>
             <span className="dash-arrow">→</span>
           </Link>
         </div>
 
-        <details className="prompt-preview">
-          <summary className="section-title">Prompt do agente</summary>
-          <pre>{instance.systemPrompt}</pre>
-        </details>
       </main>
     </div>
   );

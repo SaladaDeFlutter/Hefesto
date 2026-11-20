@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,6 +57,8 @@ async function main() {
     const st = await waitServer(Date.now() + 60_000);
     console.log("STATUS", JSON.stringify(st));
     if ((st.connectors ?? []).length > 0) throw new Error("a engine do catálogo não deve registrar conectores");
+    if (!st.appVersion) throw new Error("status sem appVersion");
+    if (!st.opencode || st.opencode.ok !== true) throw new Error("status sem saúde do opencode");
 
     const page = await fetch(`${BASE}/`);
     const html = await page.text();
@@ -99,7 +101,9 @@ async function main() {
 
     const defaults = await jsonReq<{ defaultConnectors: string[] }>("GET", "/api/settings/connectors/defaults");
     console.log("DEFAULT CONNECTORS", defaults.defaultConnectors.join(","));
-    if (!defaults.defaultConnectors.includes("discord")) throw new Error("discord não é conector padrão");
+    if (defaults.defaultConnectors.length !== 0) {
+      throw new Error("instalação nova não deve ter conectores padrão");
+    }
 
     const created = await jsonReq<{ instance: any }>("POST", "/api/instances", {
       name: "Smoke Test",
@@ -107,6 +111,7 @@ async function main() {
       personality: "direto e técnico",
       instructions: "responda em português",
       accent: "#38bdf8",
+      connectors: [{ alias: "discord", definitionId: "discord", enabled: true }],
     });
     console.log("INSTANCE", created.instance.id);
     const iid = encodeURIComponent(created.instance.id);
@@ -120,8 +125,23 @@ async function main() {
       instanceConnectors.connectors.map((c) => `${c.alias}:${c.status}`).join(","),
     );
     if (!instanceConnectors.connectors.some((c) => c.definitionId === "discord")) {
-      throw new Error("instância não recebeu o conector padrão discord");
+      throw new Error("instância não recebeu o conector discord explícito");
     }
+
+    const plain = await jsonReq<{ instance: any }>("POST", "/api/instances", {
+      name: "Smoke Sem Conectores",
+    });
+    const plainConnectors = await jsonReq<{ connectors: Array<{ alias: string }> }>(
+      "GET",
+      `/api/instances/${encodeURIComponent(plain.instance.id)}/connectors`,
+    );
+    console.log("PLAIN INSTANCE CONNECTORS", plainConnectors.connectors.length);
+    if (plainConnectors.connectors.length !== 0) {
+      throw new Error("instância nova herdou conectores padrão");
+    }
+    await fetch(`${BASE}/api/instances/${plain.instance.id}`, { method: "DELETE" });
+    const plainEngineDir = join(DATA_DIR, "engines", plain.instance.id);
+    if (existsSync(plainEngineDir)) throw new Error("engine do agente excluído não foi removida");
 
     const saved = await jsonReq<{ connectors: Array<{ secrets?: string[] }> }>(
       "PATCH",

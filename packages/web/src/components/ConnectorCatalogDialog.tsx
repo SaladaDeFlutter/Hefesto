@@ -45,7 +45,7 @@ export default function ConnectorCatalogDialog({
   function addCustom() {
     const cleanAlias = alias.trim();
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(cleanAlias)) {
-      setError("alias inválido");
+      setError("Alias inválido.");
       return;
     }
     const transport: ConnectorInput["transport"] =
@@ -59,11 +59,11 @@ export default function ConnectorCatalogDialog({
               .filter(Boolean),
           };
     if (transport.type === "remote" && !/^https?:\/\//.test(transport.url)) {
-      setError("informe uma URL http(s)");
+      setError("Informe uma URL http(s).");
       return;
     }
     if (transport.type === "local" && transport.command.length === 0) {
-      setError("informe ao menos um comando");
+      setError("Informe ao menos um comando.");
       return;
     }
     setError("");
@@ -86,14 +86,14 @@ export default function ConnectorCatalogDialog({
             </span>
             <div>
               <span className="connectors-kicker">MCP</span>
-              <h2 id="connector-modal-title">Adicionar conector</h2>
+              <h2 id="connector-modal-title">Adicionar ferramenta</h2>
               <p className="muted small">
-                Escolha um conector do catálogo ou conecte um servidor MCP próprio.
+                Escolha uma ferramenta do catálogo ou conecte um servidor MCP próprio.
               </p>
             </div>
           </div>
           <button className="btn ghost small" type="button" onClick={onClose}>
-            fechar
+            Fechar
           </button>
         </div>
 
@@ -129,7 +129,7 @@ export default function ConnectorCatalogDialog({
                 />
               </label>
               <span className="muted small">
-                {visible.length} {visible.length === 1 ? "conector" : "conectores"}
+                {visible.length} {visible.length === 1 ? "ferramenta" : "ferramentas"}
               </span>
             </div>
 
@@ -139,7 +139,7 @@ export default function ConnectorCatalogDialog({
                   <span className="connector-empty-mark" aria-hidden="true">
                     ⌕
                   </span>
-                  <strong>Nenhum conector encontrado</strong>
+                  <strong>Nenhuma ferramenta encontrada</strong>
                   <p>Tente outro nome, categoria ou ferramenta.</p>
                 </div>
               )}
@@ -172,7 +172,7 @@ export default function ConnectorCatalogDialog({
                       disabled={exists || busy}
                       onClick={() => onAddDefinition(definition)}
                     >
-                      {exists ? "instalado" : "instalar"}
+                      {exists ? "Instalado" : "Instalar"}
                     </button>
                   </div>
                 );
@@ -184,13 +184,13 @@ export default function ConnectorCatalogDialog({
             <div className="connector-advanced-note">
               <strong>Servidor MCP próprio</strong>
               <p className="muted small">
-                Use um endpoint remoto HTTP/SSE ou um processo local via stdio. O conector fica
-                registrado apenas nesta instância.
+                Use um endpoint remoto HTTP/SSE ou um processo local via stdio. A ferramenta fica
+                registrada apenas neste agente.
               </p>
             </div>
             <div className="connector-form-grid">
               <div className="field">
-                <label htmlFor="connector-alias">alias</label>
+                <label htmlFor="connector-alias">Alias</label>
                 <input
                   id="connector-alias"
                   value={alias}
@@ -199,7 +199,7 @@ export default function ConnectorCatalogDialog({
                 />
               </div>
               <div className="field">
-                <label htmlFor="connector-name">nome (opcional)</label>
+                <label htmlFor="connector-name">Nome (opcional)</label>
                 <input
                   id="connector-name"
                   value={name}
@@ -209,19 +209,19 @@ export default function ConnectorCatalogDialog({
               </div>
             </div>
             <div className="field">
-              <label htmlFor="connector-transport">transporte</label>
+              <label htmlFor="connector-transport">Transporte</label>
               <select
                 id="connector-transport"
                 value={transportType}
                 onChange={(event) => setTransportType(event.target.value as "remote" | "local")}
               >
-                <option value="remote">remoto (SSE/HTTP)</option>
-                <option value="local">local (stdio)</option>
+                <option value="remote">Remoto (SSE/HTTP)</option>
+                <option value="local">Local (stdio)</option>
               </select>
             </div>
             {transportType === "remote" ? (
               <div className="field">
-                <label htmlFor="connector-url">url</label>
+                <label htmlFor="connector-url">URL</label>
                 <input
                   id="connector-url"
                   value={url}
@@ -231,7 +231,7 @@ export default function ConnectorCatalogDialog({
               </div>
             ) : (
               <div className="field">
-                <label htmlFor="connector-command">comando (um argumento por linha)</label>
+                <label htmlFor="connector-command">Comando (um argumento por linha)</label>
                 <textarea
                   id="connector-command"
                   value={command}
@@ -243,7 +243,7 @@ export default function ConnectorCatalogDialog({
             {error && <p className="error-text">{error}</p>}
             <div className="config-actions">
               <button className="btn primary" type="button" disabled={busy} onClick={addCustom}>
-                adicionar conector
+                Adicionar ferramenta
               </button>
               <span className="muted small">Você pode editar isso depois.</span>
             </div>

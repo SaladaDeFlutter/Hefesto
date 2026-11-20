@@ -18,6 +18,7 @@ import {
   type RoleData,
   type ThreadChannel,
 } from "discord.js";
+import { getBridgeActor } from "./actor.js";
 import { config } from "./config.js";
 import { addWarning, clearWarnings, listWarnings } from "./warnings.js";
 
@@ -136,6 +137,10 @@ export async function getGuild(reference?: string): Promise<Guild> {
 }
 
 export async function listGuilds() {
+  const actor = getBridgeActor();
+  if (actor && !actor.owner) {
+    throw new Error("A lista de servidores do bot é restrita ao criador.");
+  }
   const ready = await waitReady();
   return ready.guilds.cache.map((guild) => ({
     id: guild.id,
@@ -163,11 +168,102 @@ export async function requirePermissions(
   action: string,
 ): Promise<void> {
   const me = guild.members.me ?? (await guild.members.fetchMe());
-  const missing = required.filter((bit) => !me.permissions.has(bit));
-  if (missing.length > 0) {
-    const names = missing.map((bit) => PERMISSION_NAMES.get(bit) ?? bit.toString());
+  const botMissing = required.filter((bit) => !me.permissions.has(bit));
+  if (botMissing.length > 0) {
+    const names = botMissing.map((bit) => PERMISSION_NAMES.get(bit) ?? bit.toString());
     throw new Error(`Faltam permissoes para ${action}: ${names.join(", ")}.`);
   }
+
+  const actor = getBridgeActor();
+  if (actor && !actor.owner) {
+    if (!actor.member || actor.member.guild.id !== guild.id) {
+      throw new Error(`Você não tem permissão para ${action} neste servidor.`);
+    }
+    const actorMissing = required.filter((bit) => !actor.member!.permissions.has(bit));
+    if (actorMissing.length > 0) {
+      const names = actorMissing.map((bit) => PERMISSION_NAMES.get(bit) ?? bit.toString());
+      throw new Error(`Você não tem permissão para ${action}: ${names.join(", ")}.`);
+    }
+  }
+}
+
+type PermissionChannel = {
+  guild: Guild;
+  permissionsFor: (member: GuildMember) => { has: (bit: bigint) => boolean } | null;
+};
+
+export function requireActorChannel(
+  channel: PermissionChannel,
+  required: bigint[],
+  action: string,
+): void {
+  const actor = getBridgeActor();
+  if (!actor || actor.owner) return;
+  if (!actor.member || actor.member.guild.id !== channel.guild.id) {
+    throw new Error(`Você não tem permissão para ${action} neste canal.`);
+  }
+  const permissions = channel.permissionsFor(actor.member);
+  const missing = required.filter((bit) => !permissions?.has(bit));
+  if (missing.length > 0) {
+    throw new Error(`Você não tem permissão para ${action} neste canal.`);
+  }
+}
+
+export function requireActorRoleAbove(role: Role, action: string): void {
+  const actor = getBridgeActor();
+  if (!actor || actor.owner) return;
+  if (!actor.member || actor.member.guild.id !== role.guild.id) {
+    throw new Error(`Você não tem permissão para ${action} este cargo.`);
+  }
+  if (role.position >= actor.member.roles.highest.position) {
+    throw new Error(`Você não pode ${action} um cargo igual ou acima do seu.`);
+  }
+}
+
+export function requireBotRoleAbove(role: Role, action: string): void {
+  const me = role.guild.members.me;
+  if (!me) throw new Error("O bot não está neste servidor.");
+  if (role.position >= me.roles.highest.position) {
+    throw new Error(`O cargo do bot precisa estar acima de "${role.name}" para ${action}.`);
+  }
+}
+
+export function requireActorMemberAbove(target: GuildMember, action: string): void {
+  const actor = getBridgeActor();
+  if (!actor || actor.owner) return;
+  if (!actor.member || actor.member.guild.id !== target.guild.id) {
+    throw new Error(`Você não tem permissão para ${action} este membro.`);
+  }
+  if (target.id === target.guild.ownerId) {
+    throw new Error(`Não é possível ${action} o dono do servidor.`);
+  }
+  if (target.roles.highest.position >= actor.member.roles.highest.position) {
+    throw new Error(`Você não pode ${action} um membro igual ou acima do seu cargo.`);
+  }
+}
+
+export function requireBotMemberAbove(target: GuildMember, action: string): void {
+  const me = target.guild.members.me;
+  if (!me) throw new Error("O bot não está neste servidor.");
+  if (target.roles.highest.position >= me.roles.highest.position) {
+    throw new Error(`O cargo do bot precisa estar acima de "${target.displayName}" para ${action}.`);
+  }
+}
+
+export function requireActorCanGrant(permissions: bigint | undefined, action: string): void {
+  const actor = getBridgeActor();
+  if (!actor || actor.owner || !actor.member || permissions === undefined) return;
+  const extra = permissions & ~actor.member.permissions.bitfield;
+  if (extra !== 0n) {
+    throw new Error(`Você não pode conceder permissões que você não tem (${action}).`);
+  }
+}
+
+function actorCanView(channel: NonThreadGuildBasedChannel): boolean {
+  const actor = getBridgeActor();
+  if (!actor || actor.owner) return true;
+  if (!actor.member || actor.member.guild.id !== channel.guild.id) return false;
+  return Boolean(channel.permissionsFor(actor.member)?.has(PermissionFlagsBits.ViewChannel));
 }
 
 export type DiscordChannelType =
@@ -260,7 +356,9 @@ function allChannels(guild: Guild): NonThreadGuildBasedChannel[] {
 }
 
 export function listTree(guild: Guild) {
-  const channels = allChannels(guild).sort((a, b) => a.rawPosition - b.rawPosition);
+  const channels = allChannels(guild)
+    .filter(actorCanView)
+    .sort((a, b) => a.rawPosition - b.rawPosition);
   const categories = channels.filter(
     (channel): channel is CategoryChannel => channel.type === ChannelType.GuildCategory,
   );
@@ -287,7 +385,7 @@ export async function serverInfo(includeRoles = true, guildRef?: string) {
   await requirePermissions(guild, [PermissionFlagsBits.ViewChannel], "ler detalhes do servidor");
 
   const tree = listTree(guild);
-  const channels = allChannels(guild);
+  const channels = allChannels(guild).filter(actorCanView);
   const roles = includeRoles
     ? [...guild.roles.cache.values()]
         .sort((a, b) => b.position - a.position)
@@ -393,6 +491,11 @@ export async function readMessages(input: ReadMessagesInput) {
   );
 
   const channel = await resolveChannel(guild, input.channel);
+  requireActorChannel(
+    channel,
+    [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+    "ler mensagens",
+  );
   if (!("messages" in channel)) {
     throw new Error(`O canal #${channel.name} nao tem historico de mensagens.`);
   }
@@ -503,6 +606,7 @@ async function createChannelInGuild(guild: Guild, input: CreateChannelInput) {
   }
 
   const parent = input.category ? await resolveCategory(guild, input.category) : null;
+  if (parent) requireActorChannel(parent, [PermissionFlagsBits.ManageChannels], "criar canal");
   const supportsTopic = ["text", "announcement", "forum", "media"].includes(type);
   const supportsNsfw = type !== "voice" && type !== "stage";
 
@@ -583,6 +687,7 @@ export async function editChannel(input: EditChannelInput) {
   await requirePermissions(guild, [PermissionFlagsBits.ManageChannels], "editar canal");
 
   const channel = await resolveChannel(guild, input.channel);
+  requireActorChannel(channel, [PermissionFlagsBits.ManageChannels], "editar canal");
   const data: GuildChannelEditOptions = {};
 
   if (input.name !== undefined) data.name = input.name;
@@ -614,6 +719,7 @@ export async function deleteChannel(
   await requirePermissions(guild, [PermissionFlagsBits.ManageChannels], "apagar canal");
 
   const channel = await resolveChannel(guild, channelReference);
+  requireActorChannel(channel, [PermissionFlagsBits.ManageChannels], "apagar canal");
   const summary = summarize(channel);
 
   if (config.dryRun) {
@@ -658,6 +764,11 @@ export async function sendMessage(input: SendMessageInput) {
   );
 
   const channel = await resolveChannel(guild, input.channel);
+  requireActorChannel(
+    channel,
+    [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+    "enviar mensagem",
+  );
   if (!("send" in channel)) {
     throw new Error(`O canal #${channel.name} nao aceita mensagens.`);
   }
@@ -724,6 +835,15 @@ export async function addReaction(input: AddReactionInput) {
   );
 
   const channel = await resolveChannel(guild, input.channel);
+  requireActorChannel(
+    channel,
+    [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AddReactions,
+    ],
+    "reagir a mensagem",
+  );
   if (!("messages" in channel)) {
     throw new Error(`O canal #${channel.name} nao tem mensagens.`);
   }
@@ -779,6 +899,7 @@ export async function createInvite(
   );
 
   const channel = await resolveChannel(guild, channelReference);
+  requireActorChannel(channel, [PermissionFlagsBits.CreateInstantInvite], "criar convite");
   if (!("createInvite" in channel)) {
     throw new Error(`O canal #${channel.name} nao suporta convite.`);
   }
@@ -931,6 +1052,7 @@ export async function createRole(input: CreateRoleInput, guildRef?: string) {
 
   const color = resolveColor(input.color);
   const permissions = resolvePermissions(input.permissions);
+  requireActorCanGrant(permissions, "criar cargo");
 
   if (config.dryRun) {
     return { dryRun: true, action: "create_role", ...input };
@@ -970,6 +1092,9 @@ export async function editRole(input: EditRoleInput, guildRef?: string) {
 
   const color = resolveColor(input.color);
   const permissions = resolvePermissions(input.permissions);
+  requireActorRoleAbove(role, "editar");
+  requireBotRoleAbove(role, "editar");
+  requireActorCanGrant(permissions, "editar cargo");
 
   if (config.dryRun) {
     return { dryRun: true, action: "edit_role", role: summarizeRole(role), changes: input };
@@ -1008,6 +1133,8 @@ export async function deleteRole(
       `O cargo "${role.name}" e gerenciado por uma integracao e nao pode ser apagado.`,
     );
   }
+  requireActorRoleAbove(role, "apagar");
+  requireBotRoleAbove(role, "apagar");
 
   const summary = summarizeRole(role);
   if (config.dryRun) {
@@ -1033,6 +1160,10 @@ export async function assignRole(
   if (role.managed) {
     throw new Error(`O cargo "${role.name}" e gerenciado e nao pode ser atribuido manualmente.`);
   }
+  requireActorRoleAbove(role, "atribuir");
+  requireBotRoleAbove(role, "atribuir");
+  requireActorMemberAbove(member, "atribuir cargo a");
+  requireBotMemberAbove(member, "atribuir cargo a");
 
   if (config.dryRun) {
     return {
@@ -1067,6 +1198,10 @@ export async function removeRole(
   const role = await resolveRole(guild, roleReference);
 
   if (role.id === guild.id) throw new Error("Nao e possivel remover @everyone.");
+  requireActorRoleAbove(role, "remover");
+  requireBotRoleAbove(role, "remover");
+  requireActorMemberAbove(member, "remover cargo de");
+  requireBotMemberAbove(member, "remover cargo de");
 
   if (config.dryRun) {
     return {
@@ -1107,6 +1242,8 @@ export async function timeoutMember(
   }
 
   const member = await resolveMember(guild, memberReference);
+  requireActorMemberAbove(member, "silenciar");
+  requireBotMemberAbove(member, "silenciar");
   const until = new Date(Date.now() + durationSeconds * 1000);
   const motivo = reason?.trim() || "Silenciado via Hefesto (opencode)";
 
@@ -1142,6 +1279,8 @@ export async function removeTimeout(
   await requirePermissions(guild, [PermissionFlagsBits.ModerateMembers], "remover silenciamento");
 
   const member = await resolveMember(guild, memberReference);
+  requireActorMemberAbove(member, "remover o silenciamento de");
+  requireBotMemberAbove(member, "remover o silenciamento de");
   const motivo = reason?.trim() || "Silenciamento removido via Hefesto (opencode)";
 
   if (config.dryRun) {
@@ -1184,6 +1323,8 @@ export async function kickMember(
   if (member.id === guild.members.me?.id) {
     throw new Error("Nao e possivel expulsar o proprio bot.");
   }
+  requireActorMemberAbove(member, "expulsar");
+  requireBotMemberAbove(member, "expulsar");
 
   const target = {
     id: member.id,
@@ -1213,6 +1354,8 @@ export async function warnMember(
   if (!motivo) throw new Error("Informe o motivo do aviso.");
 
   const member = await resolveMember(guild, memberReference);
+  requireActorMemberAbove(member, "avisar");
+  requireBotMemberAbove(member, "avisar");
   const warning = addWarning({
     guildId: guild.id,
     memberId: member.id,
@@ -1236,6 +1379,7 @@ export async function warnMember(
 
 export async function listMemberWarnings(memberReference?: string, guildRef?: string) {
   const guild = await getGuild(guildRef);
+  await requirePermissions(guild, [PermissionFlagsBits.ModerateMembers], "listar avisos");
   const member = memberReference ? await resolveMember(guild, memberReference) : null;
   const entries = listWarnings(guild.id, member?.id);
 
@@ -1273,6 +1417,8 @@ export async function clearMemberWarnings(
   }
 
   const member = await resolveMember(guild, memberReference);
+  requireActorMemberAbove(member, "limpar avisos de");
+  requireBotMemberAbove(member, "limpar avisos de");
   const removed = clearWarnings(guild.id, member.id);
 
   return {
@@ -1334,6 +1480,8 @@ export async function editPermissions(input: EditPermissionsInput, guildRef?: st
   const targets: PermissionTarget[] = [];
   if (input.member) {
     const member = await resolveMember(guild, input.member);
+    requireActorMemberAbove(member, "editar permissões de");
+    requireBotMemberAbove(member, "editar permissões de");
     targets.push({
       kind: "member",
       value: member,
@@ -1343,6 +1491,8 @@ export async function editPermissions(input: EditPermissionsInput, guildRef?: st
     const refs = input.roles ?? (input.role ? [input.role] : []);
     for (const ref of refs) {
       const role = await resolveRole(guild, ref);
+      requireActorRoleAbove(role, "editar permissões de");
+      requireBotRoleAbove(role, "editar permissões de");
       targets.push({
         kind: "role",
         value: role,
@@ -1352,14 +1502,24 @@ export async function editPermissions(input: EditPermissionsInput, guildRef?: st
   }
 
   const channel = await resolveChannel(guild, input.channel);
+  requireActorChannel(
+    channel,
+    [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles],
+    "editar permissões",
+  );
   const channels: NonThreadGuildBasedChannel[] = [channel];
   if (input.includeChildren) {
     if (channel.type !== ChannelType.GuildCategory) {
       throw new Error("includeChildren so vale quando o alvo e uma categoria.");
     }
-    channels.push(
-      ...allChannels(guild).filter((child) => child.parentId === channel.id),
-    );
+    for (const child of allChannels(guild).filter((item) => item.parentId === channel.id)) {
+      requireActorChannel(
+        child,
+        [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles],
+        "editar permissões",
+      );
+      channels.push(child);
+    }
   }
 
   const allow = input.allow ?? [];
@@ -1373,6 +1533,7 @@ export async function editPermissions(input: EditPermissionsInput, guildRef?: st
     throw new Error("Informe allow, deny, neutral ou clear: true.");
   }
 
+  requireActorCanGrant(resolvePermissions(allow), "editar permissões");
   const options: PermissionOverwriteOptions = {};
   for (const raw of allow) {
     const name = raw.trim();
@@ -1586,6 +1747,7 @@ export async function listThreads(input: ListThreadsInput) {
   await requirePermissions(guild, [PermissionFlagsBits.ViewChannel], "listar topicos");
 
   const parent = await resolveChannel(guild, input.channel);
+  requireActorChannel(parent, [PermissionFlagsBits.ViewChannel], "listar tópicos");
   if (!isThreadCapable(parent)) {
     throw new Error(`O canal #${parent.name} nao suporta topicos.`);
   }
@@ -1627,6 +1789,11 @@ export async function readThread(input: ReadThreadInput) {
   );
 
   const thread = await resolveThread(guild, input.thread, input.channel);
+  requireActorChannel(
+    thread,
+    [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+    "ler tópico",
+  );
   const anchors = [input.before, input.after, input.around].filter(Boolean);
   if (anchors.length > 1) {
     throw new Error("Use apenas um entre before, after e around.");
@@ -1672,6 +1839,11 @@ export async function sendThreadMessage(input: SendThreadMessageInput) {
   );
 
   const thread = await resolveThread(guild, input.thread, input.channel);
+  requireActorChannel(
+    thread,
+    [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+    "enviar mensagem no tópico",
+  );
   const embed = buildEmbedPayload(input.embed);
 
   if (config.dryRun) {
